@@ -1,0 +1,92 @@
+{
+  "fuzzy_duplicates": [
+    {
+      "artist": "morgan wallen",
+      "title_1": "last night",
+      "title_2": "la night",
+      "similarity": 0.8888888888888888,
+      "song_1": "scraped_morgan_wallen_last_night",
+      "song_2": "scraped_morgan_wallen_la_night"
+    },
+    {
+      "artist": "zebadiah evans",
+      "title_1": "severus girl from the north country",
+      "title_2": "severus girl from north country",
+      "similarity": 0.9393939393939394,
+      "song_1": "hf_01871",
+      "song_2": "hf_13758"
+    },
+    {
+      "artist": "monteagle",
+      "title_1": "total energy ii",
+      "title_2": "total energy",
+      "similarity": 0.8888888888888888,
+      "song_1": "hf_02058",
+      "song_2": "hf_16229"
+    },
+    {
+      "artist": "the grateful dead",
+      "title_1": "loose lucy live at portland memorial coliseum portland or may 19 1974",
+      "title_2": "truckin live at portland memorial coliseum portland or may 19 1974",
+      "similarity": 0.9037037037037037,
+      "song_1": "hf_02150",
+      "song_2": "hf_12799"
+    },
+    {
+      "artist": "louis armstrong",
+      "title_1": "the music goes round and round",
+      "title_2": "the music goes round and around",
+      "similarity": 0.9836065573770492,
+      "song_1": "hf_02543",
+      "song_2": "hf_08263"
+    },
+    {
+      "artist": "sons of korah",
+      "title_1": "psalm 77b",
+      "title_2": "psalm 77c",
+      "similarity": 0.8888888888888888,
+      "song_1": "hf_04923",
+      "song_2": "hf_24297"
+    },
+    {
+      "artist": "genius english translations",
+      "title_1": "twice wow english translation",
+      "title_2": "twice 2129 english translation",
+      "similarity": 0.8813559322033898,
+      "song_1": "hf_05583",
+      "song_2": "hf_15546"
+    },
+    {
+      "artist": "genius english translations",
+      "title_1": "arca machote english translation",
+      "title_2": "arca anoche english translation",
+      "similarity": 0.9206349206349206,
+      "song_1": "hf_07697",
+      "song_2": "hf_13621"
+    },
+    {
+      "artist": "dallas smith",
+      "title_1": "slow rollin",
+      "title_2": "slow rollini",
+      "similarity": 0.9565217391304348,
+      "song_1": "hf_11578",
+      "song_2": "hf_21921"
+    },
+    {
+      "artist": "walker hayes",
+      "title_1": "prescriptions",
+      "title_2": "perscriptions",
+      "similarity": 0.9230769230769231,
+      "song_1": "hf_15652",
+      "song_2": "hf_21306"
+    },
+    {
+      "artist": "the rolling stones",
+      "title_1": "under my thumb live 1981",
+      "title_2": "under my thumb live 1982",
+      "similarity": 0.9583333333333334,
+      "song_1": "hf_19946",
+      "song_2": "hf_26171"
+    }
+  ]
+}
