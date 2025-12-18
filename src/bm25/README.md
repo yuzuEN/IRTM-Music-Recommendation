@@ -111,10 +111,27 @@ similarities = cosine_similarity(query_vec.reshape(1, -1), bm25_matrix)
 3. vocabulary 會做 pruning，實際向量維度可能小於原始詞彙數
 4. 所有輸出檔案都使用 UTF-8 編碼
 
+## Demo：BM25-only Query
+
+執行 `demo_bm25_query.py` 可以快速驗證 BM25 語意向量是否有效：
+
+```bash
+python src/bm25/demo_bm25_query.py
+```
+
+這個 demo 會：
+1. 載入所有 BM25 artifacts
+2. 從 `posts_clean_expanded.jsonl` 讀取 5 筆貼文當 query
+3. 對每筆 query 做 BM25 檢索，找出 Top-10 推薦歌曲
+4. 顯示結果（包含原始貼文、推薦歌曲 ID、相似度分數）
+
+**用途**：
+- 驗證 BM25 語意向量是否有效
+- 提供 D 組員（Graph + PPR）的 baseline 對照
+- 可用於報告中的案例展示
+
+
 ## 實驗用途
 
-本模組產生的 TF-IDF 與 BM25 矩陣可用於：
-
-- **TF-IDF vs BM25 比較實驗**：比較兩種語意表示法的推薦效果
-- **FinalVec Ablation Study**：只使用語意向量 vs 語意+情緒+主題的差異
+- **Baseline 對照**：D 組員可以用 `demo_bm25_query.py` 的結果作為 Graph + PPR 的 baseline
 
