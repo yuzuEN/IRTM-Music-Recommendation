@@ -41,6 +41,7 @@ CURRENT_DIR = pathlib.Path(__file__).resolve().parent
 PROJECT_ROOT = CURRENT_DIR.parent.parent
 
 LYRICS_TOKENS_PATH = PROJECT_ROOT / "data" / "processed" / "lyrics" / "lyrics_tokens.csv"
+VOCABULARY_PATH = PROJECT_ROOT / "data" / "processed" / "lyrics" / "vocabulary.json"
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "bm25_vectors"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -81,49 +82,95 @@ def load_lyrics_tokens(csv_path) -> Tuple[List[str], List[List[str]]]:
 # 2. 建立 vocabulary 與 DF 統計
 ############################################################
 
+def load_existing_vocabulary(vocab_path: pathlib.Path) -> Dict[str, int]:
+    """
+    從 vocabulary.json 載入現有的詞彙表。
+    
+    輸入：
+        vocab_path: pathlib.Path - vocabulary.json 的路徑
+        
+    輸出：
+        vocab_terms: Dict[str, int] - 詞 → 詞頻（從 vocabulary.json 讀取）
+    """
+    with open(vocab_path, "r", encoding="utf-8") as f:
+        vocab_terms = json.load(f)
+    
+    print(f"[Vocab] Loaded existing vocabulary: {len(vocab_terms)} terms from {vocab_path}")
+    return vocab_terms
+
+
 def build_vocabulary(
     docs_tokens: List[List[str]], 
+    vocab_path: pathlib.Path = None,
     min_df: int = 5, 
     max_df_ratio: float = 0.5
 ) -> Tuple[Dict[str, int], Dict[str, int], int]:
     """
-    建立 vocabulary（詞彙表）與 DF 統計，並做 pruning。
+    建立 vocabulary（詞彙表）與 DF 統計。
+    
+    如果提供了 vocab_path，則直接使用現有的 vocabulary.json 詞彙表。
+    否則，會從 docs_tokens 重新建立 vocabulary（舊的行為）。
     
     輸入：
         docs_tokens: List[List[str]] - 所有歌曲的 tokens
-        min_df: int - 最小 document frequency（低於此值的詞丟棄）
-        max_df_ratio: float - 最大 document frequency 比例（超過此比例的詞丟棄）
+        vocab_path: pathlib.Path - 可選，現有 vocabulary.json 的路徑
+        min_df: int - 最小 document frequency（用於 DF 計算，不影響 vocabulary 選擇）
+        max_df_ratio: float - 最大 document frequency 比例（用於 DF 計算，不影響 vocabulary 選擇）
         
     輸出：
         vocab: Dict[str, int] - 詞 → column index（0 ~ |V|-1）
-        df: Dict[str, int] - 詞 → document frequency
+        df: Dict[str, int] - 詞 → document frequency（只包含在 vocabulary 中的詞）
         N: int - 總文件數（歌曲數）
     """
     N = len(docs_tokens)
     
-    # 計算每個詞的 document frequency
+    # 如果提供了 vocab_path，使用現有的 vocabulary
+    if vocab_path and vocab_path.exists():
+        # 載入現有的詞彙表（詞 → 詞頻）
+        vocab_terms = load_existing_vocabulary(vocab_path)
+        
+        # 建立 vocabulary（詞 → index），按照字母順序排序以保持一致性
+        vocab = {term: idx for idx, term in enumerate(sorted(vocab_terms.keys()))}
+        
+        print(f"[Vocab] Using existing vocabulary: {len(vocab)} terms")
+    else:
+        # 舊的行為：從 docs_tokens 建立 vocabulary
+        print("[Vocab] Building vocabulary from docs_tokens...")
+        
+        # 計算每個詞的 document frequency
+        term_doc_count = defaultdict(int)
+        for doc_tokens in docs_tokens:
+            unique_tokens = set(doc_tokens)
+            for token in unique_tokens:
+                term_doc_count[token] += 1
+        
+        # Pruning: 過少或過常見的詞丟棄
+        max_df = int(N * max_df_ratio)
+        pruned_terms = {
+            term: count 
+            for term, count in term_doc_count.items() 
+            if min_df <= count <= max_df
+        }
+        
+        # 建立 vocabulary（詞 → index）
+        vocab = {term: idx for idx, term in enumerate(sorted(pruned_terms.keys()))}
+        
+        print(f"[Vocab] Built vocabulary: {len(vocab)} terms (pruned from {len(term_doc_count)})")
+        print(f"[Vocab] Pruning: min_df={min_df}, max_df_ratio={max_df_ratio} (max_df={max_df})")
+    
+    # 計算 DF（document frequency）：只計算在 vocabulary 中的詞
+    # 這一步無論是否使用現有 vocabulary 都需要做
     term_doc_count = defaultdict(int)
     for doc_tokens in docs_tokens:
         unique_tokens = set(doc_tokens)
         for token in unique_tokens:
-            term_doc_count[token] += 1
+            if token in vocab:  # 只計算在 vocabulary 中的詞
+                term_doc_count[token] += 1
     
-    # Pruning: 過少或過常見的詞丟棄
-    max_df = int(N * max_df_ratio)
-    pruned_terms = {
-        term: count 
-        for term, count in term_doc_count.items() 
-        if min_df <= count <= max_df
-    }
+    # 建立 DF dict（只包含在 vocabulary 中的詞）
+    df = {term: term_doc_count.get(term, 0) for term in vocab.keys()}
     
-    # 建立 vocabulary（詞 → index）
-    vocab = {term: idx for idx, term in enumerate(sorted(pruned_terms.keys()))}
-    
-    # 保留 pruned 後的 df
-    df = {term: pruned_terms[term] for term in vocab.keys()}
-    
-    print(f"[Vocab] Built vocabulary: {len(vocab)} terms (pruned from {len(term_doc_count)})")
-    print(f"[Vocab] Pruning: min_df={min_df}, max_df_ratio={max_df_ratio} (max_df={max_df})")
+    print(f"[Vocab] Computed DF for {len(df)} terms in vocabulary")
     
     return vocab, df, N
 
@@ -460,8 +507,8 @@ def main():
     # 1. 讀取歌詞 tokens
     song_ids, docs_tokens = load_lyrics_tokens(LYRICS_TOKENS_PATH)
     
-    # 2. 建立 vocabulary 與 DF
-    vocab, df, N = build_vocabulary(docs_tokens, min_df=5, max_df_ratio=0.5)
+    # 2. 建立 vocabulary 與 DF（使用現有的 vocabulary.json）
+    vocab, df, N = build_vocabulary(docs_tokens, vocab_path=VOCABULARY_PATH, min_df=5, max_df_ratio=0.5)
     
     # 3. 計算文件長度統計
     doc_lengths, avgdl = compute_length_stats(docs_tokens)

@@ -33,6 +33,109 @@ python src/bm25/compute_bm25.py
 - `idf.json`：IDF 值（詞 → idf）
 - `metadata.json`：統計量與參數（N, avgdl, k1, b, min_df, max_df_ratio 等）
 
+### 2.1. 輸出檔案格式詳解
+
+#### `song_ids.json`
+- **格式**：JSON Array
+- **內容**：`["song_id_1", "song_id_2", ...]`
+- **說明**：歌曲 ID 列表，順序與矩陣的 row index 對齊（第 i 首歌對應矩陣的第 i 列）
+- **範例**：
+  ```json
+  [
+    "scraped_eminem_houdini",
+    "scraped_ariana_grande_imperfect_for_you",
+    "hf_00001",
+    ...
+  ]
+  ```
+
+#### `vocabulary.json`
+- **格式**：JSON Object
+- **內容**：`{"詞": column_index}`
+- **說明**：詞彙表，將詞映射到向量矩陣的 column index（0 ~ |V|-1）
+- **範例**：
+  ```json
+  {
+    "a": 0,
+    "aa": 1,
+    "hey": 5428,
+    "stork": 44530,
+    ...
+  }
+  ```
+- **注意**：詞彙按照字母順序排序，index 從 0 開始連續編號
+
+#### `tfidf_matrix.npz`
+- **格式**：NumPy Sparse Matrix（scipy.sparse.csr_matrix）
+- **內容**：TF-IDF 稀疏矩陣
+- **形狀**：`(num_songs, vocab_size)`，例如 `(30246, 53477)`
+- **說明**：
+  - 每一列代表一首歌的 TF-IDF 向量
+  - 每一欄代表一個詞的 TF-IDF 分數
+  - 使用稀疏格式節省記憶體
+- **載入方式**：
+  ```python
+  from scipy.sparse import load_npz
+  tfidf_matrix = load_npz("outputs/bm25_vectors/tfidf_matrix.npz")
+  ```
+
+#### `bm25_matrix.npz`
+- **格式**：NumPy Sparse Matrix（scipy.sparse.csr_matrix）
+- **內容**：BM25 稀疏矩陣
+- **形狀**：`(num_songs, vocab_size)`，例如 `(30246, 53477)`
+- **說明**：
+  - 每一列代表一首歌的 BM25 向量
+  - 每一欄代表一個詞的 BM25 分數
+  - 使用稀疏格式節省記憶體
+- **載入方式**：
+  ```python
+  from scipy.sparse import load_npz
+  bm25_matrix = load_npz("outputs/bm25_vectors/bm25_matrix.npz")
+  ```
+
+#### `idf.json`
+- **格式**：JSON Object
+- **內容**：`{"詞": idf_value}`
+- **說明**：BM25 版本的 IDF 值（用於 query encoding）
+- **公式**：\\( idf(t) = \\log\\left(\\frac{N - df_t + 0.5}{df_t + 0.5} + 1\\right) \\)
+- **範例**：
+  ```json
+  {
+    "hey": 7.399381552902967,
+    "em": 7.643003635560718,
+    "stork": 8.445350108085655,
+    ...
+  }
+  ```
+
+#### `metadata.json`
+- **格式**：JSON Object
+- **內容**：統計量與參數
+- **欄位說明**：
+  - `N`：總文件數（歌曲數）
+  - `avgdl`：平均文件長度（token 數）
+  - `doc_lengths`：每首歌的長度列表（順序與 `song_ids.json` 對齊）
+  - `vocab_size`：vocabulary 大小
+  - `k1`：BM25 參數 k1（預設 1.5）
+  - `b`：BM25 參數 b（預設 0.75）
+  - `min_df`：vocabulary pruning 參數（預設 5）
+  - `max_df_ratio`：vocabulary pruning 參數（預設 0.5）
+  - `max_df`：最大 document frequency（計算值）
+- **範例**：
+  ```json
+  {
+    "N": 30246,
+    "avgdl": 145.80083316802222,
+    "doc_lengths": [385, 128, 132, ...],
+    "vocab_size": 53477,
+    "k1": 1.5,
+    "b": 0.75,
+    "min_df": 5,
+    "max_df_ratio": 0.5,
+    "max_df": 15123
+  }
+  ```
+
 ### 3. 在其他模組中使用
 
 ```python
@@ -104,11 +207,31 @@ similarities = cosine_similarity(query_vec.reshape(1, -1), bm25_matrix)
 
 `encode_query_tokens()` 函式可將任意 tokens（例如貼文的 `expanded_tokens`）轉成與歌詞向量同維度的向量，供後續相似度計算或 FinalVec 融合使用。
 
+## Vocabulary 檔案比較
+
+本模組使用 A 組員建立的 `data/processed/lyrics/vocabulary.json` 作為詞彙來源，並產生 `outputs/bm25_vectors/vocabulary.json` 供向量化使用。兩個檔案的差異如下：
+
+| 特性 | `data/processed/lyrics/vocabulary.json` | `outputs/bm25_vectors/vocabulary.json` |
+|------|----------------------------------------|----------------------------------------|
+| **建立者** | A 組員（`preprocess_lyrics_full.py`） | C 組員（`compute_bm25.py`） |
+| **格式** | `{"詞": 詞頻}` | `{"詞": column_index}` |
+| **值的意義** | 該詞在整個語料中出現的總次數（term frequency count） | 該詞在向量矩陣中的欄位索引（0 ~ \|V\|-1） |
+| **用途** | 詞頻統計、分析用 | 向量化索引、查詢用 |
+| **Pruning** | 無（包含所有出現過的詞） | 目前無（直接使用 A 的完整 vocabulary） |
+| **總詞數** | 53,477 個詞 | 53,477 個詞（與 A 的相同） |
+| **範例** | `{"hey": 5428, "stork": 2}` | `{"hey": 5428, "stork": 44530}` |
+
+**說明**：
+- A 組員的 vocabulary 存的是**詞頻**（該詞出現幾次），用於統計分析
+- C 組員的 vocabulary 存的是**索引**（該詞在向量中的位置），用於向量化
+- 目前兩個檔案包含相同的詞彙（因為直接使用 A 的 vocabulary，沒有做額外的 pruning）
+- 詞彙按照字母順序排序，確保一致性
+
 ## 注意事項
 
-1. 執行前需確保 A 組員已執行 `preprocess_lyrics_full.py` 產生 `lyrics_tokens.csv`
+1. 執行前需確保 A 組員已執行 `preprocess_lyrics_full.py` 產生 `lyrics_tokens.csv` 和 `vocabulary.json`
 2. 矩陣使用 scipy.sparse.csr_matrix 格式，節省記憶體
-3. vocabulary 會做 pruning，實際向量維度可能小於原始詞彙數
+3. 目前 vocabulary 直接使用 A 組員的完整詞彙表，沒有做額外的 pruning（向量維度 = 53,477）
 4. 所有輸出檔案都使用 UTF-8 編碼
 
 ## Demo：BM25-only Query
