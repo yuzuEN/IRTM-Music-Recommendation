@@ -1,24 +1,28 @@
 """
-BM25-only Query Demo
-====================
+BM25-only Query Demo (Stage 1: BM25 候選生成)
+==============================================
 
 功能：
 1. 載入 BM25 artifacts（矩陣、vocabulary、IDF、metadata）
 2. 從貼文資料讀取 query（使用 expanded_tokens）
 3. 編碼 query 成 BM25 向量
-4. 計算 cosine similarity，找出 Top-K 推薦歌曲
+4. 計算 BM25 分數，找出 Top-K 候選歌曲（候選列表 + 分數）
 5. 輸出結果供驗證與 baseline 對照
 
 用途：
-- 驗證 BM25 語意向量是否有效
-- 提供 D 組員（Graph + PPR）的 baseline 對照
+- 驗證 Stage 1: BM25 語意檢索是否有效
+- 提供 D 組員（Stage 2: Reranking + PPR）的 baseline 對照
 - 可用於報告中的案例展示
+
+注意：
+- 這是「純 BM25」的結果（Stage 1 輸出）
+- 後續 D 組員會在此基礎上加入情緒/主題 reranking 和 PPR
 """
 
 import json
 import numpy as np
 from scipy.sparse import load_npz
-from sklearn.metrics.pairwise import cosine_similarity
+# 不再使用 cosine_similarity，改用 BM25 分數（dot product）
 import pathlib
 from typing import List, Tuple
 from collections import Counter
@@ -183,18 +187,18 @@ def query_bm25(
         mode="bm25"
     )
     
-    # 計算 cosine similarity（query_vec 是 1D，需要 reshape）
-    similarities = cosine_similarity(
-        query_vec.reshape(1, -1),
-        bm25_matrix
-    )[0]  # 取第一列（只有一個 query）
+    # 計算 BM25 分數（用 dot product，不是 cosine similarity）
+    # bm25_matrix 是 (num_songs, vocab_size)
+    # query_vec 是 (vocab_size,)
+    # 結果是 (num_songs,)
+    scores = bm25_matrix.dot(query_vec)
     
     # 找出 Top-K
-    top_indices = np.argsort(similarities)[::-1][:top_k]
+    top_indices = np.argsort(scores)[::-1][:top_k]
     
     # 組合成結果
     results = [
-        (artifacts["song_ids"][idx], float(similarities[idx]))
+        (artifacts["song_ids"][idx], float(scores[idx]))
         for idx in top_indices
     ]
     
@@ -254,6 +258,14 @@ def main():
     print("BM25-Only Query Demo")
     print("=" * 80)
     
+    # 檢查檔案是否存在
+    if not CLEAN_LYRICS_PATH.exists():
+        raise FileNotFoundError(f"Clean lyrics file not found: {CLEAN_LYRICS_PATH}")
+    if not BM25_DIR.exists():
+        raise FileNotFoundError(f"BM25 directory not found: {BM25_DIR}")
+    if not POSTS_PATH.exists():
+        raise FileNotFoundError(f"Posts file not found: {POSTS_PATH}")
+    
     # 1. 載入歌曲 metadata
     song_metadata = load_song_metadata(CLEAN_LYRICS_PATH)
     
@@ -287,8 +299,8 @@ def main():
     print("\n" + "=" * 80)
     print("✅ Demo Complete!")
     print("=" * 80)
-    print("\nNote: This is a BM25-only baseline.")
-    print("      D 組員可以此為 baseline，比較 Graph + PPR 的效果。")
+    print("\nNote: This is Stage 1: BM25-only baseline (候選生成).")
+    print("      D 組員可以此為 baseline，比較 Stage 2 (Reranking + PPR) 的效果。")
 
 
 if __name__ == "__main__":

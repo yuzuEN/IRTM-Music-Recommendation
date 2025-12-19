@@ -42,12 +42,16 @@ python src/bm25/compute_bm25.py
 
 #### 2.1 BM25 向量（`outputs/bm25_vectors/`）
 
+**必要檔案**：
 - `song_ids.json`：歌曲 ID 列表（順序與矩陣對齊）
 - `vocabulary.json`：詞彙表（詞 → index）
-- `tfidf_matrix.npz`：TF-IDF 稀疏矩陣（scipy.sparse.csr_matrix）
-- `bm25_matrix.npz`：BM25 稀疏矩陣（scipy.sparse.csr_matrix）
 - `idf.json`：IDF 值（詞 → idf）
 - `metadata.json`：統計量與參數（N, avgdl, k1, b, min_df, max_df_ratio 等）
+
+**可選檔案**：
+- `bm25_matrix.npz`：BM25 稀疏矩陣（scipy.sparse.csr_matrix）
+  - **用途**：用於對新 query 做檢索（進階用途）
+  - **注意**：如果只需要使用已產生的 `bm25_topk.jsonl`，則不需要此檔案
 
 #### 2.2 檢索結果（`outputs/retrieval/`）
 
@@ -90,21 +94,7 @@ python src/bm25/compute_bm25.py
   ```
 - **注意**：詞彙按照字母順序排序，index 從 0 開始連續編號
 
-#### `tfidf_matrix.npz`
-- **格式**：NumPy Sparse Matrix（scipy.sparse.csr_matrix）
-- **內容**：TF-IDF 稀疏矩陣
-- **形狀**：`(num_songs, vocab_size)`，例如 `(30246, 53477)`
-- **說明**：
-  - 每一列代表一首歌的 TF-IDF 向量
-  - 每一欄代表一個詞的 TF-IDF 分數
-  - 使用稀疏格式節省記憶體
-- **載入方式**：
-  ```python
-  from scipy.sparse import load_npz
-  tfidf_matrix = load_npz("outputs/bm25_vectors/tfidf_matrix.npz")
-  ```
-
-#### `bm25_matrix.npz`
+#### `bm25_matrix.npz`（可選）
 - **格式**：NumPy Sparse Matrix（scipy.sparse.csr_matrix）
 - **內容**：BM25 稀疏矩陣
 - **形狀**：`(num_songs, vocab_size)`，例如 `(30246, 53477)`
@@ -112,6 +102,9 @@ python src/bm25/compute_bm25.py
   - 每一列代表一首歌的 BM25 向量
   - 每一欄代表一個詞的 BM25 分數
   - 使用稀疏格式節省記憶體
+- **用途**：
+  - **主要用途**：對新 query 做檢索（進階用途）
+  - **注意**：如果只需要使用已產生的 `bm25_topk.jsonl`，則**不需要**此檔案
 - **載入方式**：
   ```python
   from scipy.sparse import load_npz
@@ -266,13 +259,15 @@ top_songs = [(song_ids[i], float(scores[i])) for i in top_indices]
 
 ### 輸出（給 D 組員的 Reranking / PPR）
 
+**必要檔案**：
 - `outputs/retrieval/bm25_topk.jsonl`：**每篇貼文的 top-K 候選歌曲**（Stage 1 輸出）
-  - 這是 D 組員做 reranking 和 PPR 的主要輸入
+  - 這是 D 組員做 reranking 和 PPR 的**主要輸入**
   - 每行包含一個 query 的候選列表與 BM25 分數
 
-- `outputs/bm25_vectors/bm25_matrix.npz`：BM25 矩陣（可選，用於進階查詢）
-- `outputs/bm25_vectors/vocabulary.json`：vocabulary（可選，用於 query encoding）
-- `outputs/bm25_vectors/idf.json`：IDF 值（可選，用於 query encoding）
+**可選檔案**（僅用於新 query 檢索）：
+- `outputs/bm25_vectors/bm25_matrix.npz`：BM25 矩陣（用於對新 query 做檢索）
+- `outputs/bm25_vectors/vocabulary.json`：vocabulary（用於 query encoding）
+- `outputs/bm25_vectors/idf.json`：IDF 值（用於 query encoding）
 - `outputs/bm25_vectors/metadata.json`：統計量（N, avgdl, k1, b 等）
 
 ### 輸出（給 B 組員）

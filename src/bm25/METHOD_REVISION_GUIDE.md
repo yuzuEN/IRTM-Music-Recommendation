@@ -213,18 +213,18 @@ def rerank_candidates(
 
 ### 立即可以做的（不依賴 B/D）
 
-- [ ] **修改 `compute_bm25.py`**
-  - [ ] 新增 `compute_bm25_topk()` 函式
-  - [ ] 修改 `main()`，對所有貼文計算 top-K 候選
-  - [ ] 輸出 `outputs/retrieval/bm25_topk.jsonl`
+- [x] **修改 `compute_bm25.py`**
+  - [x] 新增 `compute_bm25_topk()` 函式
+  - [x] 修改 `main()`，對所有貼文計算 top-K 候選
+  - [x] 輸出 `outputs/retrieval/bm25_topk.jsonl`
 
-- [ ] **更新 `demo_bm25_query.py`**
-  - [ ] 說明這是「Stage 1: BM25 候選生成」
-  - [ ] 輸出格式改為「候選列表 + 分數」
+- [x] **更新 `demo_bm25_query.py`**
+  - [x] 說明這是「Stage 1: BM25 候選生成」
+  - [x] 輸出格式改為「候選列表 + 分數」
 
-- [ ] **更新 README.md**
-  - [ ] 說明新的兩階段架構
-  - [ ] 更新輸出檔案說明
+- [x] **更新 README.md**
+  - [x] 說明新的兩階段架構
+  - [x] 更新輸出檔案說明
 
 ### 等 B 完成後做的
 
