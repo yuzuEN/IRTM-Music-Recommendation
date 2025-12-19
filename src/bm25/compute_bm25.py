@@ -42,8 +42,11 @@ PROJECT_ROOT = CURRENT_DIR.parent.parent
 
 LYRICS_TOKENS_PATH = PROJECT_ROOT / "data" / "processed" / "lyrics" / "lyrics_tokens.csv"
 VOCABULARY_PATH = PROJECT_ROOT / "data" / "processed" / "lyrics" / "vocabulary.json"
+POSTS_PATH = PROJECT_ROOT / "data" / "processed" / "posts" / "posts_clean_expanded.jsonl"
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "bm25_vectors"
+RETRIEVAL_OUTPUT_DIR = PROJECT_ROOT / "outputs" / "retrieval"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(RETRIEVAL_OUTPUT_DIR, exist_ok=True)
 
 
 ############################################################
@@ -493,7 +496,159 @@ def encode_query_tokens(
 
 
 ############################################################
-# 9. Main Pipeline
+# 9. BM25 Top-K Candidate Retrieval（對貼文計算候選）
+############################################################
+
+def compute_bm25_score_for_query(
+    query_tokens: List[str],
+    bm25_matrix: csr_matrix,
+    vocab: Dict[str, int],
+    idf: Dict[str, float],
+    metadata: dict,
+    song_ids: List[str]
+) -> np.ndarray:
+    """
+    對 query tokens 計算與所有歌曲的 BM25 分數。
+    
+    輸入：
+        query_tokens: List[str] - query tokens
+        bm25_matrix: csr_matrix - BM25 矩陣
+        vocab: Dict[str, int] - vocabulary
+        idf: Dict[str, float] - IDF 值
+        metadata: dict - 包含 N, avgdl, k1, b
+        song_ids: List[str] - 歌曲 ID 列表
+        
+    輸出：
+        scores: np.ndarray - 形狀 (num_songs,)，每首歌的 BM25 分數
+    """
+    # 編碼 query 成 BM25 向量
+    query_vec = encode_query_tokens(
+        query_tokens,
+        vocab,
+        idf,
+        metadata["N"],
+        metadata["avgdl"],
+        k1=metadata["k1"],
+        b=metadata["b"],
+        mode="bm25"
+    )
+    
+    # 計算與所有歌曲的 BM25 分數（用 dot product）
+    # bm25_matrix 是 (num_songs, vocab_size)
+    # query_vec 是 (vocab_size,)
+    # 結果是 (num_songs,)
+    scores = bm25_matrix.dot(query_vec)
+    
+    return scores
+
+
+def compute_bm25_topk_for_posts(
+    posts_path: pathlib.Path,
+    bm25_matrix: csr_matrix,
+    song_ids: List[str],
+    vocab: Dict[str, int],
+    idf: Dict[str, float],
+    metadata: dict,
+    top_k: int = 100,
+    output_path: pathlib.Path = None
+) -> None:
+    """
+    對所有貼文計算 BM25 top-K 候選，輸出到 outputs/retrieval/bm25_topk.jsonl。
+    
+    輸入：
+        posts_path: pathlib.Path - posts_clean_expanded.jsonl 路徑
+        bm25_matrix: csr_matrix - BM25 矩陣
+        song_ids: List[str] - 歌曲 ID 列表
+        vocab: Dict[str, int] - vocabulary
+        idf: Dict[str, float] - IDF 值
+        metadata: dict - 統計量
+        top_k: int - 要取幾首候選（預設 100）
+        output_path: pathlib.Path - 輸出路徑（預設 outputs/retrieval/bm25_topk.jsonl）
+    """
+    if output_path is None:
+        output_path = RETRIEVAL_OUTPUT_DIR / "bm25_topk.jsonl"
+    
+    print(f"\n[BM25 Retrieval] Computing top-{top_k} candidates for all posts...")
+    
+    query_count = 0
+    
+    with open(posts_path, "r", encoding="utf-8") as fin, \
+         open(output_path, "w", encoding="utf-8") as fout:
+        
+        for line in fin:
+            post = json.loads(line.strip())
+            query_id = f"post_{query_count}"
+            
+            # 使用 expanded_tokens（如果有的話），否則用 clean_tokens
+            query_tokens = post.get("expanded_tokens", post.get("clean_tokens", []))
+            
+            if not query_tokens:
+                # 如果沒有 tokens，跳過
+                continue
+            
+            # 計算 BM25 分數
+            scores = compute_bm25_score_for_query(
+                query_tokens,
+                bm25_matrix,
+                vocab,
+                idf,
+                metadata,
+                song_ids
+            )
+            
+            # 找出 top-K
+            top_indices = np.argsort(scores)[::-1][:top_k]
+            
+            # 組合成候選列表
+            candidates = [
+                {
+                    "song_id": song_ids[idx],
+                    "bm25_score": float(scores[idx])
+                }
+                for idx in top_indices
+            ]
+            
+            # 輸出 JSONL 格式
+            result = {
+                "query_id": query_id,
+                "raw_text": post.get("raw_text", ""),
+                "emotion": post.get("emotion", "unknown"),
+                "top_k": top_k,
+                "candidates": candidates
+            }
+            
+            fout.write(json.dumps(result, ensure_ascii=False) + "\n")
+            query_count += 1
+            
+            if query_count % 1000 == 0:
+                print(f"  Processed {query_count} queries...")
+    
+    print(f"[BM25 Retrieval] ✅ Completed! Processed {query_count} queries")
+    print(f"[BM25 Retrieval] Output: {output_path}")
+
+
+def save_idf_for_b_module(
+    idf: Dict[str, float],
+    output_path: pathlib.Path = None
+) -> None:
+    """
+    將 IDF 值存到 outputs/retrieval/idf.json，供 B 組員使用。
+    
+    輸入：
+        idf: Dict[str, float] - IDF 值
+        output_path: pathlib.Path - 輸出路徑（預設 outputs/retrieval/idf.json）
+    """
+    if output_path is None:
+        output_path = RETRIEVAL_OUTPUT_DIR / "idf.json"
+    
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(idf, f, ensure_ascii=False, indent=2)
+    
+    print(f"[Save] IDF saved for B module: {output_path}")
+
+
+############################################################
+# 10. Main Pipeline
 ############################################################
 
 def main():
@@ -544,17 +699,50 @@ def main():
         max_df_ratio=0.5
     )
     
+    # 9. 建立 metadata dict（給後續函式使用）
+    metadata = {
+        "N": N,
+        "avgdl": avgdl,
+        "k1": bm25_params["k1"],
+        "b": bm25_params["b"]
+    }
+    
+    # 10. 對所有貼文計算 BM25 top-K 候選（Stage 1: Retrieval）
+    if POSTS_PATH.exists():
+        compute_bm25_topk_for_posts(
+            POSTS_PATH,
+            bm25_matrix,
+            song_ids,
+            vocab,
+            idf_bm25,
+            metadata,
+            top_k=100,
+            output_path=RETRIEVAL_OUTPUT_DIR / "bm25_topk.jsonl"
+        )
+    else:
+        print(f"\n[Warning] Posts file not found: {POSTS_PATH}")
+        print("  Skipping BM25 top-K candidate generation.")
+    
+    # 11. 輸出 IDF 給 B 組員使用（可選）
+    save_idf_for_b_module(idf_bm25, RETRIEVAL_OUTPUT_DIR / "idf.json")
+    
     print("\n" + "=" * 60)
-    print("✅ BM25 Vector Generation Complete!")
+    print("✅ BM25 Vector Generation & Retrieval Complete!")
     print("=" * 60)
-    print(f"\nOutput directory: {OUTPUT_DIR}")
+    print(f"\nOutput directories:")
+    print(f"  - {OUTPUT_DIR}")
+    print(f"  - {RETRIEVAL_OUTPUT_DIR}")
     print("\nGenerated files:")
+    print("  [BM25 Vectors]")
     print("  - song_ids.json")
     print("  - vocabulary.json")
     print("  - tfidf_matrix.npz")
     print("  - bm25_matrix.npz")
     print("  - idf.json")
     print("  - metadata.json")
+    print("\n  [Retrieval]")
+    print("  - bm25_topk.jsonl (top-K candidates for each post)")
+    print("  - idf.json (for B module)")
 
 
 if __name__ == "__main__":
