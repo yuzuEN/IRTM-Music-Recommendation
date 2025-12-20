@@ -1,0 +1,14 @@
+{
+  "posts_path": "C:\\Users\\tinti\\Desktop\\IRTM_music\\data\\processed\\posts\\posts_clean_expanded.jsonl",
+  "n_posts": 10000,
+  "vocab_size": 50000,
+  "tfidf": {
+    "ngram_range": [
+      1,
+      2
+    ],
+    "max_features": 50000,
+    "min_df": 2,
+    "stop_words": "english"
+  }
+}

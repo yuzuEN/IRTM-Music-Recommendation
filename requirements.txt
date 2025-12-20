@@ -1,0 +1,13 @@
+# Core dependencies for IRTM Music Recommendation System
+
+# Machine Learning
+scikit-learn>=1.0.0
+numpy>=1.20.0
+joblib>=1.0.0
+
+# HuggingFace datasets (for posts_emotion_ml.py)
+datasets>=2.0.0
+
+# Data processing (optional, used in some scripts)
+pandas>=1.3.0
+

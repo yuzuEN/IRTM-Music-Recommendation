@@ -1,0 +1,586 @@
+import os
+import csv
+import json
+import numpy as np
+from typing import List, Dict, Any, Tuple, Optional
+from collections import deque
+
+from scipy import sparse
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.metrics.pairwise import cosine_similarity
+import joblib
+
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+
+# ✅ Lyrics-topic 專用 stopwords（只影響 topic TF-IDF）
+LYRICS_TOPIC_STOPWORDS = {
+    "yeah", "oh", "uh", "na", "la", "ya",
+    "choru", "chorus", "verse", "hook",
+    "da", "ah", "woah", "ooh",
+    "hey", "huh", "whoa", "mmm", "mm",
+    "choru", "chorus", "verse", "vers", "bridg", "outro", "hook",
+    "got", "get", "gotta", "got ta",
+    "wan", "want", "gon", "gonna",
+    "im", "em", "ta",
+    "say", "said", "tell", "look", "come", "let", "make",
+    "fuck", "shit", "bitch", "nigga", "ass", "damn", "hell", "yo",
+}
+
+def build_stopwords_for_lyrics_topic() -> List[str]:
+    return sorted(set(ENGLISH_STOP_WORDS) | set(LYRICS_TOPIC_STOPWORDS))
+
+
+# ===============================
+# Config
+# ===============================
+LYRICS_TOKENS_PATH = r"data/processed/lyrics/lyrics_tokens.csv"
+SONG_IDS_PATH = r"outputs/bm25_vectors/song_ids.json"   # ✅ C 的對齊順序
+
+OUT_DIR = "outputs/topic_vectors"
+os.makedirs(OUT_DIR, exist_ok=True)
+
+TFIDF_PATH = os.path.join(OUT_DIR, "lyrics_tfidf.npz")
+TFIDF_META_PATH = os.path.join(OUT_DIR, "lyrics_tfidf_meta.json")
+
+# Scan-K outputs
+SCAN_TABLE_PATH = os.path.join(OUT_DIR, "lyrics_kmeans_scanK.tsv")
+SCAN_JSON_PATH = os.path.join(OUT_DIR, "lyrics_kmeans_scanK.json")
+
+# Final chosen-K outputs
+MODEL_PATH = os.path.join(OUT_DIR, "lyrics_kmeans_model.joblib")
+ASSIGN_PATH = os.path.join(OUT_DIR, "lyrics_topic_assignments.jsonl")
+SUMMARY_PATH = os.path.join(OUT_DIR, "lyrics_topic_summary.json")
+EVAL_PATH = os.path.join(OUT_DIR, "lyrics_topic_eval.json")
+KEYWORDS_TSV_PATH = os.path.join(OUT_DIR, "lyrics_topic_keywords.tsv")
+
+# ✅ 向量輸出（給 cosine similarity）
+TOPIC_VEC_PATH = os.path.join(OUT_DIR, "TopicVec_lyrics_kmeans.npy")
+TOPIC_VEC_META_PATH = os.path.join(OUT_DIR, "TopicVec_lyrics_kmeans_meta.json")
+
+# ✅ cluster similarity pairs
+CLUSTER_SIM_PAIRS_PATH = os.path.join(OUT_DIR, "lyrics_cluster_sim_pairs.tsv")
+CLUSTER_SIM_TOPN_PATH = os.path.join(OUT_DIR, "lyrics_cluster_sim_topN.tsv")
+MERGE_INFO_PATH = os.path.join(OUT_DIR, "lyrics_cluster_merge_info.json")
+
+# K range to scan
+K_MIN = 29
+K_MAX = 29
+K_STEP = 1
+
+# Evaluation settings
+SIL_SAMPLE_N = 5000
+RANDOM_STATE = 42
+
+# Optional: treat tiny clusters as "bad"
+MIN_CLUSTER_SIZE = 30  # set 0 to disable
+
+# ✅ merge threshold
+MERGE_THRESHOLD = 0.57
+TOPN_SIM_PAIRS = 50
+
+
+# ===============================
+# Utilities
+# ===============================
+def load_song_ids(song_ids_path: str) -> List[str]:
+    with open(song_ids_path, "r", encoding="utf-8") as f:
+        song_ids = json.load(f)
+    if not isinstance(song_ids, list) or not song_ids:
+        raise ValueError("song_ids.json is empty or not a list.")
+    return [str(x) for x in song_ids]
+
+def load_lyrics_tokens_csv(csv_path: str) -> Dict[str, str]:
+    mapping: Dict[str, str] = {}
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if "song_id" not in reader.fieldnames or "tokens" not in reader.fieldnames:
+            raise ValueError("lyrics_tokens.csv must have columns: song_id,tokens")
+        for row in reader:
+            sid = str(row.get("song_id", "")).strip()
+            toks = str(row.get("tokens", "")).strip()
+            if sid:
+                mapping[sid] = toks
+    if not mapping:
+        raise ValueError("No rows loaded from lyrics_tokens.csv")
+    return mapping
+
+def align_lyrics_to_song_ids(
+    song_ids: List[str],
+    songid_to_tokens: Dict[str, str],
+    missing_policy: str = "drop",  # "drop" or "empty"
+) -> Tuple[List[str], List[str], Dict[str, int]]:
+    texts: List[str] = []
+    used: List[str] = []
+
+    missing = 0
+    for sid in song_ids:
+        if sid in songid_to_tokens and songid_to_tokens[sid].strip():
+            texts.append(songid_to_tokens[sid])
+            used.append(sid)
+        else:
+            missing += 1
+            if missing_policy == "empty":
+                texts.append("")
+                used.append(sid)
+            elif missing_policy == "drop":
+                continue
+            else:
+                raise ValueError("missing_policy must be 'drop' or 'empty'")
+
+    stats = {
+        "n_song_ids": int(len(song_ids)),
+        "n_used": int(len(used)),
+        "n_missing": int(missing),
+        "missing_policy": missing_policy,
+    }
+    if len(texts) != len(used):
+        raise RuntimeError("Alignment internal error: texts != used.")
+    return texts, used, stats
+
+def get_top_terms_per_cluster(
+    X_tfidf: sparse.spmatrix,
+    labels: np.ndarray,
+    feature_names: np.ndarray,
+    topn: int = 12,
+) -> Dict[int, List[str]]:
+    k = int(labels.max()) + 1
+    top_terms: Dict[int, List[str]] = {}
+
+    for cid in range(k):
+        idx = np.where(labels == cid)[0]
+        if len(idx) == 0:
+            top_terms[cid] = []
+            continue
+        mean_vec = X_tfidf[idx].mean(axis=0)
+        mean_vec = np.asarray(mean_vec).ravel()
+        top_idx = np.argsort(-mean_vec)[:topn]
+        top_terms[cid] = [feature_names[i] for i in top_idx if mean_vec[i] > 0]
+    return top_terms
+
+def sampled_silhouette_cosine(
+    X: sparse.spmatrix,
+    labels: np.ndarray,
+    sample_n: int,
+    random_state: int
+) -> Optional[float]:
+    n = X.shape[0]
+    if n <= 2:
+        return None
+    sample_n = min(sample_n, n)
+    rng = np.random.default_rng(random_state)
+    sample_idx = rng.choice(n, size=sample_n, replace=False)
+    return float(silhouette_score(X[sample_idx], labels[sample_idx], metric="cosine"))
+
+def cluster_stats(labels: np.ndarray, K: int) -> Dict[str, Any]:
+    sizes = np.bincount(labels, minlength=K)
+    mn = int(sizes.min()) if sizes.size else 0
+    mx = int(sizes.max()) if sizes.size else 0
+    n_small = int((sizes < MIN_CLUSTER_SIZE).sum()) if MIN_CLUSTER_SIZE > 0 else 0
+    return {"size_min": mn, "size_max": mx, "n_small_clusters": n_small}
+
+def make_topic_vector_hard(labels: np.ndarray, K: int) -> np.ndarray:
+    n = labels.shape[0]
+    vec = np.zeros((n, K), dtype=np.float32)
+    vec[np.arange(n), labels] = 1.0
+    return vec
+
+def to_py(obj):
+    """Recursively convert numpy types to Python native types for JSON serialization."""
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, (np.ndarray,)):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {str(to_py(k)): to_py(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_py(x) for x in obj]
+    return obj
+
+
+# ===============================
+# cluster similarity + merge helpers
+# ===============================
+def compute_cluster_sim_matrix(centroids: np.ndarray) -> np.ndarray:
+    return cosine_similarity(centroids)
+
+def save_cluster_sim_pairs(sim_mat: np.ndarray, threshold: float, out_path: str) -> int:
+    K = sim_mat.shape[0]
+    pairs = []
+    for i in range(K):
+        for j in range(i + 1, K):
+            s = float(sim_mat[i, j])
+            if s >= threshold:
+                pairs.append((i, j, s))
+    pairs.sort(key=lambda x: x[2], reverse=True)
+
+    with open(out_path, "w", encoding="utf-8", newline="") as f:
+        f.write("cluster_i\tcluster_j\tcosine_sim\n")
+        for i, j, s in pairs:
+            f.write(f"{i}\t{j}\t{s:.6f}\n")
+    return len(pairs)
+
+def save_cluster_sim_topN(sim_mat: np.ndarray, topn: int, out_path: str) -> None:
+    K = sim_mat.shape[0]
+    pairs = []
+    for i in range(K):
+        for j in range(i + 1, K):
+            pairs.append((i, j, float(sim_mat[i, j])))
+    pairs.sort(key=lambda x: x[2], reverse=True)
+    pairs = pairs[:topn]
+
+    with open(out_path, "w", encoding="utf-8", newline="") as f:
+        f.write("rank\tcluster_i\tcluster_j\tcosine_sim\n")
+        for r, (i, j, s) in enumerate(pairs, start=1):
+            f.write(f"{r}\t{i}\t{j}\t{s:.6f}\n")
+
+def build_merge_map_by_threshold(sim_mat: np.ndarray, threshold: float) -> Tuple[Dict[int, int], List[List[int]]]:
+    K = sim_mat.shape[0]
+    visited = [False] * K
+    groups: List[List[int]] = []
+
+    for i in range(K):
+        if visited[i]:
+            continue
+        q = deque([i])
+        visited[i] = True
+        comp = [i]
+
+        while q:
+            u = q.popleft()
+            nbrs = np.where(sim_mat[u] >= threshold)[0]
+            for v in nbrs:
+                v = int(v)
+                if v == u:
+                    continue
+                if not visited[v]:
+                    visited[v] = True
+                    q.append(v)
+                    comp.append(v)
+
+        groups.append(sorted(comp))
+
+    # 穩定排序：大群先，其次用最小 id
+    groups = sorted(groups, key=lambda g: (len(g), -g[0]), reverse=True)
+
+    old2new: Dict[int, int] = {}
+    for new_id, g in enumerate(groups):
+        for old_id in g:
+            old2new[int(old_id)] = int(new_id)
+
+    return old2new, groups
+
+def remap_labels(labels: np.ndarray, old2new: Dict[int, int]) -> np.ndarray:
+    return np.array([old2new[int(x)] for x in labels], dtype=np.int32)
+
+def get_top_terms_per_topic(
+    X_tfidf: sparse.spmatrix,
+    topic_labels: np.ndarray,
+    feature_names: np.ndarray,
+    topn: int = 12,
+) -> Dict[int, List[str]]:
+    Kt = int(topic_labels.max()) + 1
+    top_terms: Dict[int, List[str]] = {}
+    for tid in range(Kt):
+        idx = np.where(topic_labels == tid)[0]
+        if len(idx) == 0:
+            top_terms[tid] = []
+            continue
+        mean_vec = X_tfidf[idx].mean(axis=0)
+        mean_vec = np.asarray(mean_vec).ravel()
+        top_idx = np.argsort(-mean_vec)[:topn]
+        top_terms[tid] = [feature_names[i] for i in top_idx if mean_vec[i] > 0]
+    return top_terms
+
+def cluster_sizes_from_labels(labels: np.ndarray) -> Dict[int, int]:
+    K = int(labels.max()) + 1
+    return {int(i): int((labels == i).sum()) for i in range(K)}
+
+
+# ===============================
+# Main
+# ===============================
+def main():
+    # 1) Load + align
+    song_ids = load_song_ids(SONG_IDS_PATH)
+    songid_to_tokens = load_lyrics_tokens_csv(LYRICS_TOKENS_PATH)
+
+    texts, used_song_ids, align_stats = align_lyrics_to_song_ids(
+        song_ids=song_ids,
+        songid_to_tokens=songid_to_tokens,
+        missing_policy="drop",
+    )
+
+    n = len(texts)
+    print(f"[INFO] Loaded song_ids: {len(song_ids)}")
+    print(f"[INFO] Lyrics docs used: {n}")
+    print(f"[INFO] Missing lyrics in song_ids: {align_stats['n_missing']} (policy={align_stats['missing_policy']})")
+
+    if n < 10:
+        raise RuntimeError("Too few lyrics documents after alignment; check your files/paths.")
+
+    # 2) TF-IDF
+    stopwords = build_stopwords_for_lyrics_topic()
+    vectorizer = TfidfVectorizer(
+        lowercase=True,
+        ngram_range=(1, 1),
+        max_features=50000,
+        min_df=5,
+        max_df=0.5,
+        stop_words=stopwords,
+    )
+    X = vectorizer.fit_transform(texts)
+    feature_names = np.array(vectorizer.get_feature_names_out())
+
+    # DEBUG A
+    term_tfidf_sum = np.asarray(X.sum(axis=0)).ravel()
+    order_tfidf = np.argsort(-term_tfidf_sum)
+    TOP_N = 200
+    print("\n" + "="*60)
+    print("[DEBUG A] Top terms by GLOBAL TF-IDF weight")
+    print("="*60)
+    print("rank\tterm\ttfidf_sum")
+    for rank, idx in enumerate(order_tfidf[:TOP_N], start=1):
+        print(f"{rank}\t{feature_names[idx]}\t{term_tfidf_sum[idx]:.4f}")
+
+    # DEBUG B
+    df = np.asarray((X > 0).sum(axis=0)).ravel()
+    df_ratio = df / X.shape[0]
+    order_df = np.argsort(-df)
+    print("\n" + "="*60)
+    print("[DEBUG B] Top terms by DOCUMENT FREQUENCY")
+    print("="*60)
+    print("rank\tterm\tdf\tdf_ratio")
+    for rank, idx in enumerate(order_df[:TOP_N], start=1):
+        print(f"{rank}\t{feature_names[idx]}\t{df[idx]}\t{df_ratio[idx]:.2%}")
+
+    # Save TF-IDF + TFIDF meta ✅（這裡不要碰 K/merge）
+    sparse.save_npz(TFIDF_PATH, X)
+    with open(TFIDF_META_PATH, "w", encoding="utf-8") as f:
+        meta = {
+            "lyrics_tokens_path": LYRICS_TOKENS_PATH,
+            "song_ids_path": SONG_IDS_PATH,
+            "align_stats": align_stats,
+            "n_songs_used": int(n),
+            "vocab_size": int(X.shape[1]),
+            "tfidf": {
+                "ngram_range": [1, 1],
+                "max_features": 50000,
+                "min_df": 5,
+                "max_df": 0.5,
+                "stop_words": {
+                    "english": True,
+                    "lyrics_topic_stopwords": sorted(list(LYRICS_TOPIC_STOPWORDS)),
+                }
+            },
+        }
+        json.dump(to_py(meta), f, ensure_ascii=False, indent=2)
+
+    print(f"[OK] TF-IDF saved: {TFIDF_PATH}")
+    print(f"[INFO] TF-IDF shape: {X.shape}")
+
+    # 3) Scan K
+    scan_rows: List[Dict[str, Any]] = []
+    best_k = None
+    best_sil = -1e9
+
+    for K in range(K_MIN, K_MAX + 1, K_STEP):
+        print(f"[SCAN] K={K} ...")
+        kmeans = KMeans(
+            n_clusters=K,
+            random_state=RANDOM_STATE,
+            n_init=10,
+            max_iter=300,
+        )
+        labels = kmeans.fit_predict(X)
+
+        sil = sampled_silhouette_cosine(X, labels, sample_n=SIL_SAMPLE_N, random_state=RANDOM_STATE)
+        stats = cluster_stats(labels, K)
+
+        row = {
+            "K": int(K),
+            "inertia_rss": float(kmeans.inertia_),
+            "silhouette_cosine_sampled": (None if sil is None else float(sil)),
+            "silhouette_sampled_n": int(min(SIL_SAMPLE_N, X.shape[0])),
+            **stats,
+        }
+        scan_rows.append(row)
+
+        if sil is not None and sil > best_sil:
+            best_sil = sil
+            best_k = K
+
+    with open(SCAN_TABLE_PATH, "w", encoding="utf-8", newline="") as f:
+        cols = [
+            "K", "inertia_rss", "silhouette_cosine_sampled", "silhouette_sampled_n",
+            "size_min", "size_max", "n_small_clusters"
+        ]
+        f.write("\t".join(cols) + "\n")
+        for r in scan_rows:
+            f.write("\t".join(str(r.get(c, "")) for c in cols) + "\n")
+
+    scan_summary = {
+        "lyrics_tokens_path": LYRICS_TOKENS_PATH,
+        "song_ids_path": SONG_IDS_PATH,
+        "tfidf_path": TFIDF_PATH,
+        "align_stats": align_stats,
+        "K_range": {"min": K_MIN, "max": K_MAX, "step": K_STEP},
+        "silhouette": {"metric": "cosine", "sample_n": int(min(SIL_SAMPLE_N, X.shape[0]))},
+        "min_cluster_size": int(MIN_CLUSTER_SIZE),
+        "best_by_silhouette": {
+            "K": int(best_k) if best_k is not None else None,
+            "silhouette": float(best_sil) if best_k is not None else None
+        },
+        "rows": scan_rows,
+    }
+    with open(SCAN_JSON_PATH, "w", encoding="utf-8") as f:
+        json.dump(to_py(scan_summary), f, ensure_ascii=False, indent=2)
+
+    print(f"[OK] Scan table saved: {SCAN_TABLE_PATH}")
+    print(f"[OK] Scan json saved : {SCAN_JSON_PATH}")
+    print(f"[INFO] Best K by silhouette: {best_k} (sil={best_sil:.4f})")
+
+    # 4) Final KMeans
+    if best_k is None:
+        raise RuntimeError("No valid silhouette score produced; cannot choose K automatically.")
+
+    K = int(best_k)
+    kmeans = KMeans(
+        n_clusters=K,
+        random_state=RANDOM_STATE,
+        n_init=10,
+        max_iter=300,
+    )
+    labels = kmeans.fit_predict(X)
+    joblib.dump(kmeans, MODEL_PATH)
+
+    print(f"[OK] Final KMeans model saved: {MODEL_PATH}")
+    print(f"[INFO] Final KMeans inertia (RSS): {kmeans.inertia_:.2f}")
+
+    # 5) cluster centroid similarity
+    sim_mat = compute_cluster_sim_matrix(kmeans.cluster_centers_)
+    n_pairs = save_cluster_sim_pairs(sim_mat, MERGE_THRESHOLD, CLUSTER_SIM_PAIRS_PATH)
+    save_cluster_sim_topN(sim_mat, TOPN_SIM_PAIRS, CLUSTER_SIM_TOPN_PATH)
+
+    print(f"[OK] cluster_sim_pairs.tsv saved: {CLUSTER_SIM_PAIRS_PATH} (pairs >= {MERGE_THRESHOLD}: {n_pairs})")
+    print(f"[OK] cluster_sim_topN.tsv  saved: {CLUSTER_SIM_TOPN_PATH} (topN={TOPN_SIM_PAIRS})")
+    if n_pairs == 0:
+        print(
+            f"[WARN] No cluster pairs with cosine_sim >= {MERGE_THRESHOLD}. "
+            f"Try lowering MERGE_THRESHOLD and consult cluster_sim_topN.tsv."
+        )
+
+    # 6) Merge clusters
+    old2new, groups = build_merge_map_by_threshold(sim_mat, MERGE_THRESHOLD)
+    merged_labels = remap_labels(labels, old2new)
+    K_merged = int(merged_labels.max()) + 1
+
+    with open(MERGE_INFO_PATH, "w", encoding="utf-8") as f:
+        merge_info = {
+            "K_original": int(K),
+            "K_merged": int(K_merged),
+            "merge_threshold": float(MERGE_THRESHOLD),
+            "groups": groups,
+            "note": "Each group is a set of original cluster ids merged into one topic_id."
+        }
+        json.dump(to_py(merge_info), f, ensure_ascii=False, indent=2)
+
+    print(f"[OK] Merge info saved: {MERGE_INFO_PATH}")
+    print(f"[INFO] Original K={K} -> Merged K={K_merged} (threshold={MERGE_THRESHOLD})")
+
+    # 7) Topic keywords + sizes (merged)
+    top_terms = get_top_terms_per_topic(X, merged_labels, feature_names, topn=12)
+    sizes = cluster_sizes_from_labels(merged_labels)
+
+    summary = {
+        "K_original": int(K),
+        "K_merged": int(K_merged),
+        "merge_threshold": float(MERGE_THRESHOLD),
+        "topic_sizes": sizes,
+        "top_terms": {str(k): v for k, v in top_terms.items()},
+    }
+    with open(SUMMARY_PATH, "w", encoding="utf-8") as f:
+        json.dump(to_py(summary), f, ensure_ascii=False, indent=2)
+
+    eval_info = {
+        "K_original": int(K),
+        "K_merged": int(K_merged),
+        "merge_threshold": float(MERGE_THRESHOLD),
+        "inertia_rss_original": float(kmeans.inertia_),
+        "silhouette_metric": "cosine",
+        "silhouette_sampled_n": int(min(SIL_SAMPLE_N, X.shape[0])),
+        "silhouette_original_sampled": float(sampled_silhouette_cosine(X, labels, sample_n=SIL_SAMPLE_N, random_state=RANDOM_STATE)),
+        "silhouette_merged_sampled": float(sampled_silhouette_cosine(X, merged_labels, sample_n=SIL_SAMPLE_N, random_state=RANDOM_STATE)),
+        "cluster_stats_original": cluster_stats(labels, K),
+        "cluster_stats_merged": cluster_stats(merged_labels, K_merged),
+        "sim_pairs_ge_threshold": int(n_pairs),
+        "cluster_sim_pairs_path": os.path.basename(CLUSTER_SIM_PAIRS_PATH),
+        "cluster_sim_topN_path": os.path.basename(CLUSTER_SIM_TOPN_PATH),
+        "merge_info_path": os.path.basename(MERGE_INFO_PATH),
+    }
+    with open(EVAL_PATH, "w", encoding="utf-8") as f:
+        json.dump(to_py(eval_info), f, ensure_ascii=False, indent=2)
+
+    with open(KEYWORDS_TSV_PATH, "w", encoding="utf-8", newline="") as f:
+        f.write("topic_id\tsize\ttop_keywords\n")
+        for tid in range(K_merged):
+            kw = ", ".join(top_terms[tid])
+            f.write(f"{tid}\t{sizes[tid]}\t{kw}\n")
+
+    print(f"[OK] Topic summary saved: {SUMMARY_PATH}")
+    print(f"[OK] Topic eval saved   : {EVAL_PATH}")
+    print(f"[OK] Topic keywords TSV : {KEYWORDS_TSV_PATH}")
+
+    # 8) Save aligned topic vectors (merged one-hot)
+    topic_vec = make_topic_vector_hard(merged_labels, K_merged)
+    np.save(TOPIC_VEC_PATH, topic_vec)
+
+    meta = {
+        "type": "kmeans_onehot_merged",
+        "K_original": int(K),
+        "K_merged": int(K_merged),
+        "merge_threshold": float(MERGE_THRESHOLD),
+        "shape": [int(topic_vec.shape[0]), int(topic_vec.shape[1])],
+        "aligned_to_song_ids_json": True,
+        "song_ids_path": SONG_IDS_PATH,
+        "note": "Row i corresponds to used_song_ids[i] (subset of song_ids.json if missing_policy=drop).",
+        "align_stats": align_stats,
+        "tfidf_path": TFIDF_PATH,
+        "model_path": MODEL_PATH,
+        "cluster_sim_pairs_path": CLUSTER_SIM_PAIRS_PATH,
+        "cluster_sim_topN_path": CLUSTER_SIM_TOPN_PATH,
+        "merge_info_path": MERGE_INFO_PATH,
+    }
+    with open(TOPIC_VEC_META_PATH, "w", encoding="utf-8") as f:
+        json.dump(to_py(meta), f, ensure_ascii=False, indent=2)
+
+    print(f"[OK] Topic vectors saved: {TOPIC_VEC_PATH}")
+    print(f"[OK] Topic vector meta  : {TOPIC_VEC_META_PATH}")
+
+    # 9) Assignments
+    top_terms_orig = get_top_terms_per_cluster(X, labels, feature_names, topn=12)
+
+    with open(ASSIGN_PATH, "w", encoding="utf-8") as f:
+        for i in range(n):
+            sid = used_song_ids[i]
+            orig_cid = int(labels[i])
+            tid = int(merged_labels[i])
+            record = {
+                "row_idx": int(i),
+                "song_id": sid,
+                "topic_id": int(tid),
+                "topic_top_keywords": top_terms[tid][:12],
+                "orig_cluster_id": int(orig_cid),
+                "orig_cluster_top_keywords": top_terms_orig[orig_cid][:12],
+            }
+            f.write(json.dumps(to_py(record), ensure_ascii=False) + "\n")
+
+    print(f"[OK] Assignments saved: {ASSIGN_PATH}")
+    print("[DONE]")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,12 @@
+{
+  "K": 29,
+  "inertia_rss": 8641.879884144173,
+  "silhouette_metric": "cosine",
+  "silhouette_sampled_n": 5000,
+  "silhouette_sampled": 0.07910167202684118,
+  "cluster_stats": {
+    "size_min": 105,
+    "size_max": 985,
+    "n_small_clusters": 0
+  }
+}
