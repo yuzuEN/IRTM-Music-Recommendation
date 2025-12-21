@@ -1,0 +1,24 @@
+{
+  "type": "kmeans_onehot_merged",
+  "K_original": 29,
+  "K_merged": 20,
+  "merge_threshold": 0.57,
+  "shape": [
+    30246,
+    20
+  ],
+  "aligned_to_song_ids_json": true,
+  "song_ids_path": "outputs/bm25_vectors/song_ids.json",
+  "note": "Row i corresponds to used_song_ids[i] (subset of song_ids.json if missing_policy=drop).",
+  "align_stats": {
+    "n_song_ids": 30246,
+    "n_used": 30246,
+    "n_missing": 0,
+    "missing_policy": "drop"
+  },
+  "tfidf_path": "outputs/topic_vectors\\lyrics_tfidf.npz",
+  "model_path": "outputs/topic_vectors\\lyrics_kmeans_model.joblib",
+  "cluster_sim_pairs_path": "outputs/topic_vectors\\lyrics_cluster_sim_pairs.tsv",
+  "cluster_sim_topN_path": "outputs/topic_vectors\\lyrics_cluster_sim_topN.tsv",
+  "merge_info_path": "outputs/topic_vectors\\lyrics_cluster_merge_info.json"
+}

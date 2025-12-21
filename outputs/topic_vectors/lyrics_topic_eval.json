@@ -1,0 +1,24 @@
+{
+  "K_original": 29,
+  "K_merged": 20,
+  "merge_threshold": 0.57,
+  "inertia_rss_original": 28436.01118127694,
+  "silhouette_metric": "cosine",
+  "silhouette_sampled_n": 5000,
+  "silhouette_original_sampled": 0.006393351187562822,
+  "silhouette_merged_sampled": -0.002925509554640503,
+  "cluster_stats_original": {
+    "size_min": 123,
+    "size_max": 8115,
+    "n_small_clusters": 0
+  },
+  "cluster_stats_merged": {
+    "size_min": 123,
+    "size_max": 21589,
+    "n_small_clusters": 0
+  },
+  "sim_pairs_ge_threshold": 17,
+  "cluster_sim_pairs_path": "lyrics_cluster_sim_pairs.tsv",
+  "cluster_sim_topN_path": "lyrics_cluster_sim_topN.tsv",
+  "merge_info_path": "lyrics_cluster_merge_info.json"
+}

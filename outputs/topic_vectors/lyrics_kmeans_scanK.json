@@ -1,0 +1,36 @@
+{
+  "lyrics_tokens_path": "data/processed/lyrics/lyrics_tokens.csv",
+  "song_ids_path": "outputs/bm25_vectors/song_ids.json",
+  "tfidf_path": "outputs/topic_vectors\\lyrics_tfidf.npz",
+  "align_stats": {
+    "n_song_ids": 30246,
+    "n_used": 30246,
+    "n_missing": 0,
+    "missing_policy": "drop"
+  },
+  "K_range": {
+    "min": 29,
+    "max": 29,
+    "step": 1
+  },
+  "silhouette": {
+    "metric": "cosine",
+    "sample_n": 5000
+  },
+  "min_cluster_size": 30,
+  "best_by_silhouette": {
+    "K": 29,
+    "silhouette": 0.006393351187562822
+  },
+  "rows": [
+    {
+      "K": 29,
+      "inertia_rss": 28436.011181276943,
+      "silhouette_cosine_sampled": 0.006393351187562822,
+      "silhouette_sampled_n": 5000,
+      "size_min": 123,
+      "size_max": 8115,
+      "n_small_clusters": 0
+    }
+  ]
+}
