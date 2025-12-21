@@ -16,16 +16,24 @@ from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 
 # ✅ Lyrics-topic 專用 stopwords（只影響 topic TF-IDF）
 LYRICS_TOPIC_STOPWORDS = {
+    # 語氣詞和填充詞
     "yeah", "oh", "uh", "na", "la", "ya",
-    "choru", "chorus", "verse", "hook",
     "da", "ah", "woah", "ooh",
     "hey", "huh", "whoa", "mmm", "mm",
+    # 歌曲結構詞
     "choru", "chorus", "verse", "vers", "bridg", "outro", "hook",
+    # 口語化詞
     "got", "get", "gotta", "got ta",
     "wan", "want", "gon", "gonna",
-    "im", "em", "ta",
+    "im", "em", "ta", "babi", "away", "yea", "ayi", "ay", "yuh", "aye", "lil", "tryna",
+    # 通用動詞
     "say", "said", "tell", "look", "come", "let", "make",
+    # 粗俗詞
     "fuck", "shit", "bitch", "nigga", "ass", "damn", "hell", "yo",
+    # # ✅ 新增：過於通用的情感/時間詞（出現在太多主題中，降低區分度）
+    # "love", "feel", "time", "way", "caus",  # cause 的詞幹
+    # "need", "think", "thing", "day", "night", "life",
+    # "heart", "eye", "hand", "arm",
 }
 
 def build_stopwords_for_lyrics_topic() -> List[str]:
@@ -50,6 +58,7 @@ SCAN_JSON_PATH = os.path.join(OUT_DIR, "lyrics_kmeans_scanK.json")
 
 # Final chosen-K outputs
 MODEL_PATH = os.path.join(OUT_DIR, "lyrics_kmeans_model.joblib")
+VECTORIZER_PATH = os.path.join(OUT_DIR, "lyrics_tfidf_vectorizer.joblib")  # ✅ 新增：保存 vectorizer
 ASSIGN_PATH = os.path.join(OUT_DIR, "lyrics_topic_assignments.jsonl")
 SUMMARY_PATH = os.path.join(OUT_DIR, "lyrics_topic_summary.json")
 EVAL_PATH = os.path.join(OUT_DIR, "lyrics_topic_eval.json")
@@ -77,8 +86,11 @@ RANDOM_STATE = 42
 MIN_CLUSTER_SIZE = 30  # set 0 to disable
 
 # ✅ merge threshold
-MERGE_THRESHOLD = 0.57
+MERGE_THRESHOLD = 0.5
 TOPN_SIM_PAIRS = 50
+
+# ✅ High-frequency word filtering (自動將高頻詞加入 stopwords)
+HIGH_FREQ_TOP_PERCENT = 20  # 出現在超過 20% 文檔中的詞會被加入 stopwords
 
 
 # ===============================
@@ -322,15 +334,54 @@ def main():
     if n < 10:
         raise RuntimeError("Too few lyrics documents after alignment; check your files/paths.")
 
-    # 2) TF-IDF
+    # 2) TF-IDF（兩階段：先檢測高頻詞，再加入 stopwords）
     stopwords = build_stopwords_for_lyrics_topic()
+    
+    # 第一階段：先 fit 一次，檢測高頻詞
+    print("[TF-IDF] Stage 1: Detecting high-frequency words...")
+    vectorizer_temp = TfidfVectorizer(
+        lowercase=True,
+        ngram_range=(1, 1),
+        max_features=50000,
+        min_df=8,
+        max_df=1.0,  # 先不過濾，讓所有詞都進來
+        stop_words=stopwords,
+    )
+    X_temp = vectorizer_temp.fit_transform(texts)
+    feature_names_temp = np.array(vectorizer_temp.get_feature_names_out())
+    
+    # 計算每個詞的 document frequency（出現在多少個文檔中）
+    doc_freq = np.asarray((X_temp > 0).sum(axis=0)).ravel()  # (vocab_size,)
+    doc_freq_ratio = doc_freq / X_temp.shape[0]  # 出現在多少比例的文檔中
+    
+    # 找出高頻詞（例如：出現在超過 TOP_PERCENT% 文檔中的詞）
+    high_freq_threshold = HIGH_FREQ_TOP_PERCENT / 100.0
+    high_freq_mask = doc_freq_ratio >= high_freq_threshold
+    high_freq_words_candidates = set(feature_names_temp[high_freq_mask])
+    
+    # ✅ 排除已經在 LYRICS_TOPIC_STOPWORDS 中的詞（因為這些已經在 stopwords 中了）
+    high_freq_words = high_freq_words_candidates - LYRICS_TOPIC_STOPWORDS
+    
+    print(f"[TF-IDF] Found {len(high_freq_words_candidates)} high-frequency words (appear in >= {HIGH_FREQ_TOP_PERCENT}% of documents)")
+    print(f"[TF-IDF] After excluding LYRICS_TOPIC_STOPWORDS: {len(high_freq_words)} words to add")
+    if len(high_freq_words) > 0:
+        print(f"[TF-IDF] Top 20 high-frequency words to add: {sorted(list(high_freq_words))[:20]}")
+    
+    # 將高頻詞加入 stopwords（轉換為 set 以便合併，然後轉回 list）
+    stopwords_set = set(stopwords)
+    stopwords_extended_set = stopwords_set | high_freq_words
+    stopwords_extended = sorted(list(stopwords_extended_set))  # ✅ 轉回 list，因為 TfidfVectorizer 需要 list
+    print(f"[TF-IDF] Extended stopwords: {len(stopwords_set)} -> {len(stopwords_extended_set)} (+{len(high_freq_words)})")
+    
+    # 第二階段：使用擴展後的 stopwords 重新 fit
+    print("[TF-IDF] Stage 2: Fitting with extended stopwords...")
     vectorizer = TfidfVectorizer(
         lowercase=True,
         ngram_range=(1, 1),
         max_features=50000,
-        min_df=5,
-        max_df=0.5,
-        stop_words=stopwords,
+        min_df=8,
+        max_df=0.35,  # 仍然保留這個參數作為額外過濾
+        stop_words=stopwords_extended,  # ✅ 現在是 list，符合 TfidfVectorizer 的要求
     )
     X = vectorizer.fit_transform(texts)
     feature_names = np.array(vectorizer.get_feature_names_out())
@@ -369,11 +420,13 @@ def main():
             "tfidf": {
                 "ngram_range": [1, 1],
                 "max_features": 50000,
-                "min_df": 5,
-                "max_df": 0.5,
+                "min_df": 8,
+                "max_df": 0.35,
+                "high_freq_top_percent": HIGH_FREQ_TOP_PERCENT,
                 "stop_words": {
                     "english": True,
                     "lyrics_topic_stopwords": sorted(list(LYRICS_TOPIC_STOPWORDS)),
+                    "auto_detected_high_freq_words": sorted(list(high_freq_words)),  # ✅ 記錄自動檢測的高頻詞
                 }
             },
         }
@@ -451,13 +504,18 @@ def main():
     kmeans = KMeans(
         n_clusters=K,
         random_state=RANDOM_STATE,
-        n_init=10,
+        n_init=5,  # ✅ 減少初始化次數以節省記憶體
         max_iter=300,
+        init='random',  # ✅ 使用 random 初始化避免稀疏矩陣記憶體問題
     )
     labels = kmeans.fit_predict(X)
     joblib.dump(kmeans, MODEL_PATH)
+    
+    # ✅ 保存 vectorizer（供 posts_topic_align20.py 使用）
+    joblib.dump(vectorizer, VECTORIZER_PATH)
 
     print(f"[OK] Final KMeans model saved: {MODEL_PATH}")
+    print(f"[OK] TF-IDF vectorizer saved: {VECTORIZER_PATH}")
     print(f"[INFO] Final KMeans inertia (RSS): {kmeans.inertia_:.2f}")
 
     # 5) cluster centroid similarity
