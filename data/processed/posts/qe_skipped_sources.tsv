@@ -1,0 +1,201 @@
+source_token	total_skips	top_reasons
+trying	1541	source_high_freq_gate:1541
+today	1490	source_high_freq_gate:1490
+life	1475	source_high_freq_gate:1475
+people	1271	source_high_freq_gate:1271
+day	1205	source_high_freq_gate:1205
+still	1080	source_high_freq_gate:1080
+brain	1071	source_high_freq_gate:1071
+cannot	923	source_high_freq_gate:923
+chill	899	source_high_freq_gate:899
+soft	894	source_high_freq_gate:894
+things	891	source_high_freq_gate:891
+like	886	source_high_freq_gate:886
+vibes	855	source_high_freq_gate:855
+thinking	849	source_high_freq_gate:849
+good	849	source_high_freq_gate:849
+feels	789	source_high_freq_gate:789
+random	787	source_high_freq_gate:787
+low	740	source_high_freq_gate:740
+heart	708	source_high_freq_gate:708
+fine	675	source_high_freq_gate:675
+social	651	source_high_freq_gate:651
+little	640	source_high_freq_gate:640
+small	608	source_high_freq_gate:608
+quiet	596	source_high_freq_gate:596
+new	584	source_high_freq_gate:584
+energy	580	source_high_freq_gate:580
+nothing	576	source_high_freq_gate:576
+scared	559	no_valid_candidates:335, pos_blocked:v:218, pos_blocked:s:6
+wish	558	source_high_freq_gate:558
+better	556	source_high_freq_gate:556
+need	529	source_high_freq_gate:529
+neutral	526	source_high_freq_gate:526
+actually	523	source_high_freq_gate:523
+days	520	source_high_freq_gate:520
+finally	504	source_high_freq_gate:504
+notokay	501	source_high_freq_gate:501
+excited	488	no_valid_candidates:425, pos_blocked:v:63
+going	472	too_many_synsets:472
+could	467	no_synsets:467
+heavy	464	too_many_synsets:464
+night	462	no_valid_candidates:462
+daily	461	no_valid_candidates:461
+instamood	458	no_synsets:458
+insta	458	no_synsets:458
+twist	457	too_many_synsets:457
+sad	450	no_valid_candidates:311, pos_blocked:s:139
+tired	448	no_valid_candidates:412, pos_blocked:v:36
+everything	436	no_synsets:436
+sociallife	434	no_synsets:434
+weekend	411	no_valid_candidates:403, pos_blocked:v:8
+talk	407	no_valid_candidates:404, pos_blocked:v:3
+self	386	no_valid_candidates:386
+grateful	386	no_valid_candidates:386
+strangers	385	no_valid_candidates:385
+done	385	no_valid_candidates:333, pos_blocked:v:52
+please	378	no_valid_candidates:284, pos_blocked:v:94
+time	376	no_valid_candidates:376
+mode	375	no_valid_candidates:375
+big	372	too_many_synsets:372
+wait	369	no_valid_candidates:333, pos_blocked:v:36
+exhausted	368	no_valid_candidates:254, pos_blocked:v:114
+hyped	366	no_valid_candidates:366
+moving	365	too_many_synsets:365
+stop	363	too_many_synsets:363
+walk	361	too_many_synsets:361
+turned	360	too_many_synsets:360
+plot	360	no_valid_candidates:314, pos_blocked:v:46
+feel	359	too_many_synsets:359
+surprise	357	no_valid_candidates:291, pos_blocked:v:66
+message	354	no_valid_candidates:335, pos_blocked:v:19
+whole	351	no_valid_candidates:330, pos_blocked:s:21
+unexpected	343	no_valid_candidates:343
+pretending	342	no_valid_candidates:260, pos_blocked:v:82
+feeling	338	too_many_synsets:338
+wow	336	no_valid_candidates:336
+fear	334	no_valid_candidates:196, pos_blocked:v:138
+anxiety	334	no_valid_candidates:334
+overthinking	326	no_synsets:326
+lonely	326	pos_blocked:s:198, no_valid_candidates:128
+middle	322	no_valid_candidates:322
+forever	322	no_valid_candidates:322
+kind	318	no_valid_candidates:301, pos_blocked:s:17
+phone	315	no_valid_candidates:315
+full	315	no_valid_candidates:309, pos_blocked:s:6
+weekendvibes	287	no_synsets:287
+moment	282	no_valid_candidates:282
+softday	281	no_synsets:281
+happy	280	no_valid_candidates:157, pos_blocked:s:123
+selfcare	279	no_synsets:279
+excitement	278	no_valid_candidates:278
+goodvibes	275	no_synsets:275
+ordinaryday	274	no_synsets:274
+surprised	273	no_valid_candidates:226, pos_blocked:v:47
+cringe	273	no_valid_candidates:273
+simplethings	272	no_synsets:272
+simple	272	no_valid_candidates:232, pos_blocked:s:40
+smalljoys	271	no_synsets:271
+littlethings	270	no_synsets:270
+cantwait	270	no_synsets:270
+cant	270	no_valid_candidates:270
+fuming	269	no_valid_candidates:181, pos_blocked:v:88
+sadness	268	no_valid_candidates:268
+wild	267	too_many_synsets:267
+nothingwild	267	no_synsets:267
+annoyed	267	no_valid_candidates:165, pos_blocked:s:102
+softsad	266	no_synsets:266
+week	265	no_valid_candidates:265
+rant	265	no_valid_candidates:265
+softheart	264	no_synsets:264
+brainpleasechill	264	no_synsets:264
+lifebelike	263	no_synsets:263
+lifebe	263	no_synsets:263
+everyone	263	no_synsets:263
+block	263	too_many_synsets:263
+dobetter	262	no_synsets:262
+service	261	too_many_synsets:261
+itsalot	261	no_synsets:261
+noise	260	no_valid_candidates:260
+letsgoo	260	no_synsets:260
+irritated	260	no_valid_candidates:237, pos_blocked:s:23
+backgroundnoise	260	no_synsets:260
+background	260	no_valid_candidates:260
+playlist	259	no_valid_candidates:259
+key	259	too_many_synsets:259
+slowday	258	no_synsets:258
+slow	258	no_valid_candidates:169, pos_blocked:s:72, pos_blocked:v:17
+emotionalthings	258	no_synsets:258
+emotional	258	no_valid_candidates:258
+starting	257	too_many_synsets:257
+hands	257	too_many_synsets:257
+deepbreaths	257	no_synsets:257
+joy	256	no_valid_candidates:206, pos_blocked:v:50
+soexcited	255	no_synsets:255
+outofnowhere	255	no_synsets:255
+disgusted	254	no_valid_candidates:206, pos_blocked:s:48
+bigmood	254	no_synsets:254
+anymore	254	no_valid_candidates:254
+gross	253	no_valid_candidates:253
+yikes	252	no_synsets:252
+disgust	252	no_valid_candidates:252
+tiny	251	no_valid_candidates:231, pos_blocked:s:20
+anxious	251	pos_blocked:s:143, no_valid_candidates:108
+getting	250	too_many_synsets:250
+didntseethatcoming	250	no_synsets:250
+bound	250	too_many_synsets:250
+aries	250	no_valid_candidates:250
+anger	250	no_valid_candidates:222, pos_blocked:v:28
+tonight	249	no_valid_candidates:249
+thanks	249	no_valid_candidates:249
+sundayfunday	249	no_synsets:249
+sunday	249	no_valid_candidates:249
+plotwist	249	no_synsets:249
+fun	249	no_valid_candidates:249
+nervous	248	pos_blocked:s:134, no_valid_candidates:114
+overit	247	no_synsets:247
+fully	247	no_valid_candidates:247
+hyper	246	no_synsets:246
+mentalhealth	244	no_synsets:244
+ick	244	no_synsets:244
+health	244	no_valid_candidates:244
+bad	244	too_many_synsets:244
+losing	241	no_valid_candidates:222, pos_blocked:v:19
+chaos	241	no_valid_candidates:241
+socialanxiety	240	no_synsets:240
+another	240	pos_blocked:s:156, no_valid_candidates:84
+nope	239	no_synsets:239
+justhere	239	no_synsets:239
+happened	239	no_valid_candidates:146, pos_blocked:v:93
+emails	239	no_valid_candidates:224, pos_blocked:v:15
+believe	239	pos_blocked:v:239
+watching	238	no_valid_candidates:238
+seeing	238	too_many_synsets:238
+change	238	too_many_synsets:238
+something	237	no_synsets:237
+mean	237	too_many_synsets:237
+deserve	237	no_valid_candidates:233, pos_blocked:v:4
+went	236	too_many_synsets:236
+shook	235	no_valid_candidates:176, pos_blocked:v:59
+literally	235	no_valid_candidates:235
+finishing	235	pos_blocked:v:125, no_valid_candidates:110
+without	234	no_synsets:234
+sendhelp	234	no_synsets:234
+send	234	no_valid_candidates:140, pos_blocked:v:94
+nothanks	233	no_synsets:233
+hold	233	too_many_synsets:233
+hanks	233	no_valid_candidates:233
+turn	232	too_many_synsets:232
+disappear	232	no_valid_candidates:232
+putting	230	pos_blocked:v:141, no_valid_candidates:89
+sit	227	pos_blocked:v:137, no_valid_candidates:90
+know	227	no_valid_candidates:190, pos_blocked:v:37
+fast	225	no_valid_candidates:225
+blanket	225	no_valid_candidates:225
+toronto	224	no_valid_candidates:224
+saving	223	too_many_synsets:223
+right	223	too_many_synsets:223
+mental	223	no_valid_candidates:223
+chicago	217	no_valid_candidates:217
+honestly	216	no_valid_candidates:216
+staring	215	no_valid_candidates:209, pos_blocked:s:6

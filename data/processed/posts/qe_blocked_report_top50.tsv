@@ -1,0 +1,51 @@
+blocked_term	count	top_reasons	top_sources
+way	2442	same_as_source:1415, newterm_df_gate:1027	way:1415, mode:488, ways:260, manners:166, room:113
+mode	2107	same_as_source:1270, newterm_df_gate:837	mode:1270, way:516, manners:182, ways:139
+talk	1586	same_as_source:1493, lemma_count<10:93	talk:1493, talks:93
+night	1551	same_as_source:1551	night:1551
+scream	1549	lemma_count<10:838, newterm_df_gate:359, same_as_source:339	screaming:776, scream:339, wow:336, cried:98
+moment	1545	same_as_source:912, newterm_df_gate:633	moment:912, minutes:276, instant:145, second:130, bit:82
+second	1498	lemma_count<10:1007, same_as_source:401, lemma_count<2:90	moment:622, second:401, minutes:248, instant:145, bit:82
+manner	1430	newterm_blocklist:1430	way:516, mode:488, manners:287, ways:139
+time	1382	same_as_source:1257, lemma_count<10:125	time:1257, sentence:125
+style	1325	newterm_blocklist:1325	way:516, mode:488, manners:182, ways:139
+fashion	1325	newterm_df_gate:1325	way:516, mode:488, manners:182, ways:139
+whole	1288	same_as_source:1044, lemma_count<2:142, lemma_count<10:102	whole:1044, completely:244
+minute	1241	lemma_count<10:1137, lemma_count<2:104	moment:622, minutes:262, instant:145, second:130, bit:82
+thought	1225	newterm_df_gate:1116, lemma_count<10:103, lemma_count<2:6	thoughts:976, idea:141, opinions:108
+self	1201	same_as_source:1201	self:1201
+phone	1100	same_as_source:964, lemma_count<10:122, lemma_count<2:14	phone:964, headphones:136
+forever	1058	same_as_source:1058	forever:1058
+week	1039	same_as_source:819, lemma_count<10:208, lemma_count<2:12	week:819, weeks:220
+middle	1030	same_as_source:1030	middle:1030
+plot	979	same_as_source:979	plot:979
+bit	948	lemma_count<10:638, same_as_source:282, lemma_count<2:28	moment:282, bit:282, minutes:254, second:130
+sadness	945	same_as_source:945	sadness:945
+surprise	934	same_as_source:934	surprise:934
+noise	925	same_as_source:925	noise:925
+care	909	same_as_source:672, lemma_count<10:196, lemma_count<2:41	care:672, fear:237
+background	901	same_as_source:901	background:901
+stranger	883	newterm_df_gate:498, lemma_count<10:385	strangers:770, unknown:113
+excitement	863	same_as_source:863	excitement:863
+fear	846	same_as_source:660, lemma_count<10:186	fear:660, care:186
+emotional	830	same_as_source:830	emotional:830
+cant	810	same_as_source:810	cant:810
+quietly	807	same_as_source:688, lemma_count<10:119	quietly:688, softly:119
+process	788	same_as_source:788	process:788
+soul	780	same_as_source:780	soul:780
+idea	772	same_as_source:422, newterm_blocklist:350	idea:422, thoughts:350
+fun	769	same_as_source:769	fun:769
+chaos	765	same_as_source:765	chaos:765
+game	760	same_as_source:393, lemma_count<10:314, lemma_count<2:53	game:393, plot:314, brave:53
+aries	750	same_as_source:750	aries:750
+story	749	lemma_count<10:375, same_as_source:374	story:374, account:252, floor:123
+mo	748	too_short:748	moment:282, minutes:254, second:130, bit:82
+sunday	747	same_as_source:747	sunday:747
+screaming	741	same_as_source:515, lemma_count<10:226	screaming:515, scream:226
+shriek	741	lemma_count<10:728, lemma_count<2:13	screaming:515, scream:226
+shrieking	741	lemma_count<10:728, lemma_count<2:13	screaming:515, scream:226
+screech	741	lemma_count<10:728, lemma_count<2:13	screaming:515, scream:226
+screeching	741	lemma_count<10:728, lemma_count<2:13	screaming:515, scream:226
+fully	741	same_as_source:741	fully:741
+unknown	724	lemma_count<10:385, same_as_source:339	strangers:385, unknown:339
+humanity	716	same_as_source:716	humanity:716
