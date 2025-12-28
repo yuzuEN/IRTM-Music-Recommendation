@@ -86,7 +86,7 @@ RANDOM_STATE = 42
 MIN_CLUSTER_SIZE = 30  # set 0 to disable
 
 # ✅ merge threshold
-MERGE_THRESHOLD = 0.5
+MERGE_THRESHOLD = 0.7
 TOPN_SIM_PAIRS = 50
 
 # ✅ High-frequency word filtering (自動將高頻詞加入 stopwords)
@@ -531,8 +531,107 @@ def main():
             f"Try lowering MERGE_THRESHOLD and consult cluster_sim_topN.tsv."
         )
 
-    # 6) Merge clusters
+    # 6) Merge clusters (first pass: threshold-based)
     old2new, groups = build_merge_map_by_threshold(sim_mat, MERGE_THRESHOLD)
+    merged_labels_temp = remap_labels(labels, old2new)
+    K_merged_temp = int(merged_labels_temp.max()) + 1
+    
+    print(f"[INFO] First pass merge: Original K={K} -> Merged K={K_merged_temp} (threshold={MERGE_THRESHOLD})")
+    
+    # ✅ 手動合併額外的主題對（基於合併後的主題）
+    # 策略：先基於阈值合併得到25個主題，然後基於合併後主題的關鍵詞來匹配和合併
+    
+    def merge_groups_manually_by_merged_topic_ids(groups: List[List[int]], merged_topic_pairs: List[Tuple[int, int]], old2new_map: Dict[int, int]) -> List[List[int]]:
+        """基於合併後的主題ID來合併groups"""
+        # 建立合併後topic_id到groups索引的映射
+        merged_topic_to_group_idx = {}
+        for g_idx, group in enumerate(groups):
+            # 找出這個group對應的合併後topic_id（取group中第一個元素的映射）
+            if group:
+                first_orig_id = group[0]
+                merged_topic_id = old2new_map.get(first_orig_id)
+                if merged_topic_id is not None:
+                    merged_topic_to_group_idx[merged_topic_id] = g_idx
+        
+        # 合併指定的合併後主題對（需要動態更新映射，因為合併後索引會變化）
+        for merged_id1, merged_id2 in merged_topic_pairs:
+            # 重新建立映射（因為前面的合併可能改變了索引）
+            merged_topic_to_group_idx = {}
+            for g_idx, group in enumerate(groups):
+                if group is not None and group:  # 只處理非None的組
+                    first_orig_id = group[0]
+                    merged_topic_id = old2new_map.get(first_orig_id)
+                    if merged_topic_id is not None:
+                        merged_topic_to_group_idx[merged_topic_id] = g_idx
+            
+            if merged_id1 not in merged_topic_to_group_idx or merged_id2 not in merged_topic_to_group_idx:
+                print(f"[Warn] Cannot merge merged topic {merged_id1} and {merged_id2}: one or both not found")
+                continue
+            
+            idx1 = merged_topic_to_group_idx[merged_id1]
+            idx2 = merged_topic_to_group_idx[merged_id2]
+            
+            if idx1 == idx2:
+                print(f"[Info] Merged topic {merged_id1} and {merged_id2} already in the same group")
+                continue
+            
+            # 檢查是否為None（已被合併）
+            if groups[idx1] is None or groups[idx2] is None:
+                print(f"[Warn] Cannot merge merged topic {merged_id1} and {merged_id2}: one or both groups are None")
+                continue
+            
+            # 合併兩個組
+            groups[idx1].extend(groups[idx2])
+            groups[idx1] = sorted(list(set(groups[idx1])))  # 去重並排序
+            
+            # 移除idx2的組（設為None，稍後過濾）
+            groups[idx2] = None
+        
+        # 過濾None的組並重新排序
+        groups = [g for g in groups if g is not None]
+        groups = sorted(groups, key=lambda g: (len(g), -g[0]), reverse=True)
+        
+        return groups
+    
+    # ✅ 手動合併指定的合併後主題對（K=25的主題ID）
+    # 策略：直接使用合併後的主題ID（15, 18, 3, 4, 7, 8），這些是第一次threshold合併後的主題ID
+    print(f"[Merge] Preparing to merge merged topic pairs...")
+    
+    # 定義要合併的合併後主題對（這些是第一次threshold合併後的K=25主題ID）
+    manual_merge_merged_pairs = [
+        (15, 18),  # 合併後主題 15 + 18
+        (3, 4),    # 合併後主題 3 + 4
+        (7, 8),    # 合併後主題 7 + 8
+    ]
+    
+    merged_topic_pairs_to_merge = []
+    
+    for merged_id1, merged_id2 in manual_merge_merged_pairs:
+        # 檢查是否在有效範圍內
+        if merged_id1 >= K_merged_temp or merged_id2 >= K_merged_temp:
+            print(f"[Warn] Invalid merged topic IDs: {merged_id1} or {merged_id2} (K_merged={K_merged_temp})")
+            continue
+        
+        if merged_id1 == merged_id2:
+            print(f"[Info] Merged topics {merged_id1} and {merged_id2} are the same, skipping")
+            continue
+        
+        merged_topic_pairs_to_merge.append((merged_id1, merged_id2))
+        print(f"[Merge] Will merge: Merged topic {merged_id1} + Merged topic {merged_id2}")
+    
+    # 執行合併
+    if merged_topic_pairs_to_merge:
+        print(f"[Merge] Applying {len(merged_topic_pairs_to_merge)} manual merges on merged topics: {merged_topic_pairs_to_merge}")
+        groups = merge_groups_manually_by_merged_topic_ids(groups, merged_topic_pairs_to_merge, old2new)
+    else:
+        print(f"[Warn] No manual merges applied - no matching topics found")
+    
+    # 重新建立 old2new 映射
+    old2new = {}
+    for new_id, g in enumerate(groups):
+        for old_id in g:
+            old2new[int(old_id)] = int(new_id)
+    
     merged_labels = remap_labels(labels, old2new)
     K_merged = int(merged_labels.max()) + 1
 

@@ -123,8 +123,8 @@ def compute_query_emotion(
     # 1. Lexicon 情緒
     lex_emotion = compute_post_emotion(tokens, nrc_lexicon)
     
-    # 2. Emoji 情緒
-    emoji_emotion, _, _ = post_emoji_emotion(post_text, emoji_table)
+    # 2. Emoji 情緒（需要獲取 emoji_used 來判斷是否有實際信號）
+    emoji_emotion, emoji_used, _ = post_emoji_emotion(post_text, emoji_table)
     
     # 3. ML 模型情緒
     # 需要將 tokens 轉換成文本
@@ -132,16 +132,54 @@ def compute_query_emotion(
     model_probs = emotion_model.predict_proba([post_text_for_model])[0]
     model_emotion = model_probs.astype(np.float32)
     
-    # 4. 融合（使用與 posts_emotion_fusion.py 相同的權重）
-    WEIGHT_LEXICON = 0.3
-    WEIGHT_EMOJI = 0.2
-    WEIGHT_CLASSIFIER = 0.5
+    # 4. 融合（使用優化後的權重：0.04, 0.06, 0.90）
+    # 參考：pipeline/evaluate_emotion_fusion_weights.py 的實驗結果
+    WEIGHT_LEXICON = 0.04
+    WEIGHT_EMOJI = 0.06
+    WEIGHT_CLASSIFIER = 0.90
     
-    fused = (
-        WEIGHT_LEXICON * lex_emotion +
-        WEIGHT_EMOJI * emoji_emotion +
-        WEIGHT_CLASSIFIER * model_emotion
-    )
+    # 檢查是否有實際信號（排除 neutral fallback）
+    # 條件融合規則：
+    # - 如果 lex 是 fallback（neutral = 1.0），排除 lex，只用 emoji + ML
+    # - 如果 emoji 是 fallback（沒有 emoji 或被覆蓋），排除 emoji，只用 lex + ML
+    # - 如果都是 fallback，只用 ML
+    from src.emotion.posts_emotion_lex import EMOTION2IDX
+    neutral_idx = EMOTION2IDX["neutral"]  # neutral 是索引 7
+    
+    # Lexicon fallback 檢查：如果只有 neutral = 1.0，其他都是 0，表示是 fallback
+    has_lexicon_signal = not (lex_emotion[neutral_idx] == 1.0 and lex_emotion.sum() == 1.0)
+    
+    # Emoji fallback 檢查：如果 emoji_used == 0，表示沒有 emoji 或被覆蓋，會返回 neutral = 1.0
+    has_emoji_signal = emoji_used > 0
+    
+    # 條件融合：只使用有效信號，排除 fallback 情況
+    valid_signals = []
+    valid_weights = []
+    
+    if has_lexicon_signal:
+        valid_signals.append(lex_emotion)
+        valid_weights.append(WEIGHT_LEXICON)
+    
+    if has_emoji_signal:
+        valid_signals.append(emoji_emotion)
+        valid_weights.append(WEIGHT_EMOJI)
+    
+    # ML 模型總是有效（因為它總是有預測）
+    valid_signals.append(model_emotion)
+    valid_weights.append(WEIGHT_CLASSIFIER)
+    
+    # 重新正規化權重（保持相對比例）
+    # 例如：如果 lex 被排除，emoji(0.06) + ML(0.90) = 0.96，重新正規化為 emoji(0.0625) + ML(0.9375)
+    total_weight = sum(valid_weights)
+    if total_weight > 0:
+        normalized_weights = [w / total_weight for w in valid_weights]
+        # 加權融合
+        fused = np.zeros(8, dtype=np.float32)
+        for signal, weight in zip(valid_signals, normalized_weights):
+            fused += weight * signal
+    else:
+        # 如果所有權重都是 0（理論上不應該發生，因為 ML 總是有效），只用 ML
+        fused = model_emotion
     
     # 正規化
     s = fused.sum()
@@ -370,7 +408,7 @@ def recommend_songs_for_post(
     
     # 提取候選歌曲的向量
     candidate_emotion = models_and_data["song_emotion"][bm25_top_indices]  # (1000, 8)
-    candidate_topic = models_and_data["song_topic"][bm25_top_indices]      # (1000, 21)
+    candidate_topic = models_and_data["song_topic"][bm25_top_indices]      # (1000, K_merged)
     
     # 計算相似度（只對候選）
     from sklearn.metrics.pairwise import cosine_similarity
@@ -450,7 +488,7 @@ def load_cluster_mapping_local() -> Tuple[Dict[int, int], int]:
     with open(MERGE_INFO_PATH, "r", encoding="utf-8") as f:
         merge_info = json.load(f)
     
-    K_merged = merge_info.get("K_merged", 21)
+    K_merged = merge_info.get("K_merged", 22)  # ✅ 默认值更新为22（当前合并后的主题数）
     groups = merge_info.get("groups", [])
     
     mapping = {}
@@ -536,7 +574,7 @@ def main():
         print(f"\n{rec['rank']:2d}. {candidate_mark} {title} - {artist}")
         print(f"    Song ID: {song_id}")
         print(f"    PPR: {rec['ppr_score']:.10f} | Teleport: {rec['teleportation_score']:.10f} | "
-              f"BM25: {rec['bm25_score']:.4f} | 29D Sim: {rec['combined_sim']:.4f}")
+              f"BM25: {rec['bm25_score']:.4f} | 30D Sim: {rec['combined_sim']:.4f}")
         if lyrics_preview:
             print(f"    Lyrics: {lyrics_preview}")
     

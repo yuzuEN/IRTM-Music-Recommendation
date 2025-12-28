@@ -146,11 +146,11 @@ def load_lyrics_kmeans_model(model_path: str):
 
 def load_cluster_mapping() -> Tuple[Dict[int, int], int]:
     """
-    載入 cluster merge mapping（將原始 29 個 clusters 映射到合併後的 20 個）。
+    載入 cluster merge mapping（將原始 29 個 clusters 映射到合併後的 K_merged 個）。
     
     返回：
         mapping: Dict[original_cluster_id, merged_cluster_id]
-        K_merged: 合併後的 cluster 數量
+        K_merged: 合併後的 cluster 數量（動態讀取，目前為22）
     """
     merge_info_path = os.path.join(OUT_DIR, "lyrics_cluster_merge_info.json")
     
@@ -184,18 +184,18 @@ def align_posts_to_lyrics_topics(
     K_merged: int
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    用歌曲的 TF-IDF vectorizer 和 KMeans 模型預測貼文主題，並映射到合併後的 20 維。
+    用歌曲的 TF-IDF vectorizer 和 KMeans 模型預測貼文主題，並映射到合併後的 K_merged 維。
     
     輸入：
         post_texts: List[str] - 貼文文本列表
         lyrics_vectorizer: TfidfVectorizer - 歌曲的 TF-IDF vectorizer（已 fit）
         lyrics_kmeans: KMeans - 歌曲的 KMeans 模型（29 維，原始）
         cluster_mapping: Dict[int, int] - 原始 cluster_id 到合併 cluster_id 的映射
-        K_merged: int - 合併後的 cluster 數量（20）
+        K_merged: int - 合併後的 cluster 數量（動態，目前為22）
         
     輸出：
-        topic_labels: np.ndarray - 主題標籤 (num_posts,) - 合併後的標籤（0-19）
-        topic_vectors: np.ndarray - 20 維 one-hot 向量 (num_posts, 20)
+        topic_labels: np.ndarray - 主題標籤 (num_posts,) - 合併後的標籤（0 到 K_merged-1）
+        topic_vectors: np.ndarray - K_merged 維 one-hot 向量 (num_posts, K_merged)
     """
     print(f"[Align] Transforming posts with lyrics TF-IDF vectorizer...")
     
@@ -209,13 +209,13 @@ def align_posts_to_lyrics_topics(
     print(f"[Align] Original topic labels shape: {topic_labels_original.shape}")
     print(f"[Align] Original topic distribution: {np.bincount(topic_labels_original, minlength=lyrics_kmeans.n_clusters)}")
     
-    # 映射到合併後的 cluster_id（20 維）
-    print(f"[Align] Mapping to merged clusters (20D)...")
+    # 映射到合併後的 cluster_id（K_merged 維）
+    print(f"[Align] Mapping to merged clusters ({K_merged}D)...")
     topic_labels = np.array([cluster_mapping.get(int(tid), 0) for tid in topic_labels_original])
     print(f"[Align] Merged topic labels shape: {topic_labels.shape}")
     print(f"[Align] Merged topic distribution: {np.bincount(topic_labels, minlength=K_merged)}")
     
-    # 轉換成 one-hot 向量（20 維）
+    # 轉換成 one-hot 向量（K_merged 維）
     num_posts = len(post_texts)
     topic_vectors = np.zeros((num_posts, K_merged), dtype=np.float32)
     topic_vectors[np.arange(num_posts), topic_labels] = 1.0

@@ -46,9 +46,9 @@ FUSED_EMOTION_PATH = os.path.join(OUT_DIR, "EmotionVec_posts_fused.npy")
 FUSION_META_PATH = os.path.join(OUT_DIR, "post_emotion_fusion_meta.json")
 
 # 融合權重（可調整）
-WEIGHT_LEXICON = 0.3   # α: Lexicon 權重
-WEIGHT_EMOJI = 0.2     # β: Emoji 權重
-WEIGHT_CLASSIFIER = 0.5  # γ: ML 模型權重
+WEIGHT_LEXICON = 0.04   # α: Lexicon 權重
+WEIGHT_EMOJI = 0.06     # β: Emoji 權重
+WEIGHT_CLASSIFIER = 0.9  # γ: ML 模型權重
 
 # 驗證權重和為 1.0
 assert abs(WEIGHT_LEXICON + WEIGHT_EMOJI + WEIGHT_CLASSIFIER - 1.0) < 1e-6, \

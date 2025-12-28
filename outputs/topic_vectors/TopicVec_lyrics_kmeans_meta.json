@@ -1,11 +1,11 @@
 {
   "type": "kmeans_onehot_merged",
   "K_original": 29,
-  "K_merged": 20,
-  "merge_threshold": 0.57,
+  "K_merged": 22,
+  "merge_threshold": 0.7,
   "shape": [
     30246,
-    20
+    22
   ],
   "aligned_to_song_ids_json": true,
   "song_ids_path": "outputs/bm25_vectors/song_ids.json",

@@ -1,0 +1,30 @@
+{
+  "type": "fused_emotion",
+  "method": "weighted_combination",
+  "weights": {
+    "lexicon": 0.04,
+    "emoji": 0.06,
+    "classifier": 0.9
+  },
+  "formula": "E_fused = α·E_lexicon + β·E_emoji + γ·E_classifier",
+  "input_files": {
+    "lexicon": "EmotionVec_posts_lex.npy",
+    "emoji": "EmotionVec_posts_emoji.npy",
+    "classifier": "EmotionVec_posts_model.npy"
+  },
+  "output_file": "EmotionVec_posts_fused.npy",
+  "shape": [
+    10000,
+    8
+  ],
+  "emotions": [
+    "joy",
+    "anger",
+    "fear",
+    "sadness",
+    "surprise",
+    "disgust",
+    "excitement",
+    "neutral"
+  ]
+}

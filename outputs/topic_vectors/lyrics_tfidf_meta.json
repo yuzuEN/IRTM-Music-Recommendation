@@ -8,20 +8,26 @@
     "missing_policy": "drop"
   },
   "n_songs_used": 30246,
-  "vocab_size": 15229,
+  "vocab_size": 11828,
   "tfidf": {
     "ngram_range": [
       1,
       1
     ],
     "max_features": 50000,
-    "min_df": 5,
-    "max_df": 0.5,
+    "min_df": 8,
+    "max_df": 0.35,
+    "high_freq_top_percent": 20,
     "stop_words": {
       "english": true,
       "lyrics_topic_stopwords": [
         "ah",
         "ass",
+        "away",
+        "ay",
+        "aye",
+        "ayi",
+        "babi",
         "bitch",
         "bridg",
         "choru",
@@ -44,6 +50,7 @@
         "im",
         "la",
         "let",
+        "lil",
         "look",
         "make",
         "mm",
@@ -58,6 +65,7 @@
         "shit",
         "ta",
         "tell",
+        "tryna",
         "uh",
         "vers",
         "verse",
@@ -66,8 +74,29 @@
         "whoa",
         "woah",
         "ya",
+        "yea",
         "yeah",
-        "yo"
+        "yo",
+        "yuh"
+      ],
+      "auto_detected_high_freq_words": [
+        "caus",
+        "day",
+        "eye",
+        "feel",
+        "heart",
+        "know",
+        "life",
+        "like",
+        "love",
+        "need",
+        "night",
+        "right",
+        "thing",
+        "think",
+        "time",
+        "tri",
+        "way"
       ]
     }
   }

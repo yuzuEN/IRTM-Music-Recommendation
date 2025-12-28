@@ -5,11 +5,11 @@
   ],
   "topic_vector_shape": [
     30246,
-    20
+    22
   ],
   "combined_vector_shape": [
     30246,
-    28
+    30
   ],
   "sparsify_strategy": "top_m",
   "top_m": 20,

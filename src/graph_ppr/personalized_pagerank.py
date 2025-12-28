@@ -92,10 +92,10 @@ def load_graph_and_vectors():
     num_songs = len(song_ids)
     assert song_emotion.shape[0] == num_songs, f"Emotion vectors shape mismatch: {song_emotion.shape[0]} != {num_songs}"
     assert song_topic.shape[0] == num_songs, f"Topic vectors shape mismatch: {song_topic.shape[0]} != {num_songs}"
-    # ✅ 動態檢查：合併後的維度可能是 20 或 21（取決於 merge_threshold）
+    # ✅ 動態檢查：合併後的維度（取決於 merge_threshold 和手動合併）
     song_topic_dim = song_topic.shape[1]
     print(f"[Load] Song topic dimension: {song_topic_dim} (merged)")
-    assert song_topic_dim >= 20 and song_topic_dim <= 21, f"Song topic vectors should be 20-21D (merged), got {song_topic_dim}D"
+    assert song_topic_dim >= 15 and song_topic_dim <= 30, f"Song topic vectors should be 15-30D (merged), got {song_topic_dim}D"
     assert graph.shape[0] == num_songs, f"Graph shape mismatch: {graph.shape[0]} != {num_songs}"
     
     return graph, song_emotion, song_topic, song_ids

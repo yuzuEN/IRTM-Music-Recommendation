@@ -20,16 +20,16 @@
   "min_cluster_size": 30,
   "best_by_silhouette": {
     "K": 29,
-    "silhouette": 0.006393351187562822
+    "silhouette": 0.00668957109571671
   },
   "rows": [
     {
       "K": 29,
-      "inertia_rss": 28436.011181276943,
-      "silhouette_cosine_sampled": 0.006393351187562822,
+      "inertia_rss": 28712.810255230033,
+      "silhouette_cosine_sampled": 0.00668957109571671,
       "silhouette_sampled_n": 5000,
-      "size_min": 123,
-      "size_max": 8115,
+      "size_min": 124,
+      "size_max": 8935,
       "n_small_clusters": 0
     }
   ]

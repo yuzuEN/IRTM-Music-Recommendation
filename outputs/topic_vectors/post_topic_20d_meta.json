@@ -1,0 +1,36 @@
+{
+  "type": "aligned_to_lyrics_20d",
+  "K_original": 29,
+  "K_merged": 22,
+  "shape": [
+    10000,
+    22
+  ],
+  "lyrics_kmeans_model_path": "outputs/topic_vectors\\lyrics_kmeans_model.joblib",
+  "lyrics_tfidf_meta_path": "outputs/topic_vectors\\lyrics_tfidf_meta.json",
+  "posts_path": "C:\\Users\\tinti\\Desktop\\IRTM_music\\data\\processed\\posts\\posts_clean_expanded.jsonl",
+  "topic_distribution": {
+    "0": 9422,
+    "1": 257,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 99,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 0,
+    "12": 0,
+    "13": 0,
+    "14": 189,
+    "15": 0,
+    "16": 33,
+    "17": 0,
+    "18": 0,
+    "19": 0,
+    "20": 0,
+    "21": 0
+  }
+}
